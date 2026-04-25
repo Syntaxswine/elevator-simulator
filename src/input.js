@@ -1,4 +1,4 @@
-import { computeLayout, screenYToTowerY, screenXToTowerX } from './layout.js';
+import { computeLayout, screenYToTowerY, screenXToTowerX, getCameraY } from './layout.js';
 import {
   computeKeypadModalArea,
   computeKeypadButtons,
@@ -61,7 +61,7 @@ export function attachInput(canvas, gameState) {
 
     // Tower-view tap on the player's current floor → walk to that x.
     if (insideRect(p, layout.tower) && gameState.player.state !== 'IN_ELEVATOR') {
-      const cameraY = gameState.elevator.position + 0.5;
+      const cameraY = getCameraY(gameState.player, gameState.elevator);
       const towerY = screenYToTowerY(p.y, layout, cameraY);
       const tappedFloor = Math.floor(towerY);
       if (tappedFloor === gameState.player.floor) {

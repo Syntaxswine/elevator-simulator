@@ -8,7 +8,7 @@ import {
   CORRIDOR_WIDTH_UNITS,
   SHAFT_WIDTH_UNITS,
 } from './config.js';
-import { towerYToScreenY, towerXToScreenX } from './layout.js';
+import { towerYToScreenY, towerXToScreenX, getCameraY } from './layout.js';
 import { isPlayerVisible } from './player.js';
 import { getCurrentFloor, isFloorCalled } from './elevator.js';
 import { isNpcVisible, npcRenderFloor, npcRenderXUnits } from './npc.js';
@@ -146,7 +146,7 @@ function renderIndicator(ctx, layout, gameState) {
 function renderTowerView(ctx, layout, gameState) {
   const { tower: rect } = layout;
   const { tower: towerModel, elevator, player, assets } = gameState;
-  const cameraY = elevator.position + 0.5;  // center on car middle
+  const cameraY = getCameraY(player, elevator);
 
   ctx.save();
   ctx.beginPath();

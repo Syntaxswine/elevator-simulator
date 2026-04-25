@@ -46,3 +46,11 @@ export function screenYToTowerY(screenY, layout, cameraY) {
 export function screenXToTowerX(screenX, layout) {
   return (screenX - layout.tower.x) / layout.unitSizePx;
 }
+
+// Camera anchor: follow the player. While riding, that's the elevator;
+// otherwise it's whatever floor the player is standing on. This keeps the
+// player's floor visible even when NPC traffic drags the car elsewhere.
+export function getCameraY(player, elevator) {
+  if (player.state === 'IN_ELEVATOR') return elevator.position + 0.5;
+  return player.floor + 0.5;
+}

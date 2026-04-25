@@ -84,9 +84,13 @@ A tower-setup screen is dropped for now. The 12-floor layout is fixed, so there'
 
 The earlier "widen at the base" idea is dropped — uniform floors are simpler and read better at phone sizes. (One gap to flag: this loses some silhouette interest. If we want any vertical variety later, easiest add-back is decorative facade detail, not floor-width changes.)
 
-### Viewport / camera
+### Camera
 
-12 floors should fit in the top region without scrolling on most viewports. Verify when we scaffold. If portrait-mobile is too tight, the camera follows the elevator car.
+- **Vertical:** the tower viewport is always centered vertically on the **elevator car**. When the elevator moves, the tower scrolls past it.
+- **Horizontal:** no scroll. The 9-unit floor (plus 0.5 walls each side = 10 units) fits within the tower viewport at typical phone widths.
+- **Player rendering:** the player is fixed at the **horizontal middle** of their floor segment and walks left/right within the on-screen 4-wide corridor; the world doesn't scroll horizontally, the player just translates within the viewport.
+- **Player + elevator co-location (M2 default):** while there's only one call active at a time and no NPCs, the elevator stays parked at the player's floor when they walk off, so the player is always at vertical center too. They diverge only in M4 when external calls drag the elevator away.
+- **M4 edge case:** when NPC calls move the elevator off the player's floor, the player's floor scrolls off-center. They remain on that floor and need to call the car back. UX implication flagged in §7.
 
 ### Modal keypad (summoned from panel picture)
 
@@ -105,10 +109,7 @@ When the player taps the panel picture (lower-right), a modal overlay covers the
 └──────────────────────────────────┘
 ```
 
-Buttons sized for thumb taps. Tapping any button **dismisses the modal and acts**:
-- Floor button → triggers the auto-dispatch sequence (see §5.3).
-- ▲ / ▼ → request directional service (see §5.4 design note).
-- STOP → emergency stop.
+Buttons sized for thumb taps. Tapping a floor button **adds it to the in-car queue** and lights up; the car services queued floors in travel order. ▲/▼ register a hall call (M4). STOP triggers emergency stop. Whether tapping a floor button auto-dismisses the modal or keeps it open for multi-press is open (§7 #2); the more elevator-like behavior is to keep it open until the player explicitly closes it.
 
 Door open/close is **not** in the modal — that's handled by tapping the elevator picture directly.
 
@@ -146,28 +147,26 @@ IDLE → MOVING_DOWN ⇄ DECELERATING → ARRIVED → DOORS_OPENING
 ANY  → EMERGENCY_STOP → IDLE (after reset)
 ```
 
-**B. Dispatcher — staged in two phases:**
+**B. Dispatcher — collective-selective from the start, expanded in phases:**
 
-**Phase 1 (M2): Auto-dispatch.** One floor request at a time. Pressing a floor button:
-1. (if doors open) `DOORS_CLOSING → IDLE`
-2. `MOVING_*` toward target, `DECELERATING` near it
-3. `ARRIVED → DOORS_OPENING → DOORS_OPEN`
-That's the full trip. No queue; if the player taps another floor button mid-trip we either ignore it, override, or queue it (decide — leaning *override* for the simplest UX in M2).
+The elevator behaves like a real one: when traveling **up** it services pending requests in **ascending floor order**; when traveling **down**, in **descending floor order**. Mid-trip presses for floors in the current direction get serviced en route. Opposite-direction or already-passed presses queue until the current direction's requests are exhausted, then the car reverses.
 
-**Phase 2 (M3+): Collective-selective queue (the ideal).** Real elevators service all requests in the **current direction of travel** before reversing.
-- `upCalls: Set<floor>` — external up requests
-- `downCalls: Set<floor>` — external down requests
-- `carCalls: Set<floor>` — inside-car requests
-- Direction: `UP | DOWN | NONE`
-- Next stop = nearest pending request in current direction; if none, flip direction.
+State:
+- `carCalls: Set<floor>` — inside-car requests (M2)
+- `upCalls: Set<floor>` — external up hall-calls (M4)
+- `downCalls: Set<floor>` — external down hall-calls (M4)
+- `direction: UP | DOWN | NONE`
+- Next stop = nearest pending request in `direction`; if none, flip direction; if both empty, IDLE.
 
-Phase 2 unlocks the real "realistic elevator" claim. It's also what makes NPC traffic interesting (NPCs calling the car while you're riding).
+**Phase split:**
+- **M2 — In-car queue.** Only `carCalls`. Player can tap several floor buttons; car services them in travel order. This already gives the realistic feel.
+- **M4 — Hall calls + NPCs.** Add `upCalls`/`downCalls`, wire ▲/▼ to the player's current floor, introduce NPCs that generate external calls. Now the dispatcher's full collective-selective behavior earns its keep.
 
 **Physics / timing (all tunable):**
 - `accel` (floors/s²)
 - `maxSpeed` (floors/s)
 - `doorOpenDuration` (ms)
-- `doorDwellTime` (ms before auto-close — Phase 2 only)
+- `doorDwellTime` (ms before auto-close — relevant once there's a queue, i.e. from M2)
 - `doorCloseCancelable` (door-open button interrupts closing — realism)
 - `floorChime` (audio hook)
 
@@ -180,17 +179,17 @@ Hit-test dispatcher mapping screen taps to events:
 | Region | Tap action |
 |---|---|
 | Tower view, player's current floor | walk target — player glides horizontally |
-| Tower view, other floors (Phase 2) | optional: queue a hall call |
+| Tower view, other floors (M4) | optional: register a hall call |
 | Elevator picture (lower-left) | toggle doors (open if closed, close if open) — only valid while car is `IDLE` |
 | ENTR sub-button (under elevator pic) | walk emoji into car, if car is at player's floor with doors open |
 | EXIT sub-button (under elevator pic) | walk emoji out of car, if doors are open |
 | Panel picture (lower-right) | open modal keypad |
-| Modal: floor button | dismiss modal + trigger auto-dispatch |
-| Modal: ▲ / ▼ | dismiss modal + register directional call |
-| Modal: STOP | dismiss modal + emergency stop |
+| Modal: floor button | add floor to in-car queue, light button (modal stay-or-dismiss per §7 #2) |
+| Modal: ▲ / ▼ | register hall call from player's current floor (M4) |
+| Modal: STOP | emergency stop, dismiss modal |
 | Modal: close button | dismiss modal, no action |
 
-**▲/▼ semantics.** Real elevators put up/down on each floor (hall-call buttons), not in the car. Treating them as "hall call from the player's current floor with this preferred direction" is the reading I'd default to. Mostly only matters in Phase 2 (queue) — in Phase 1 they could be redundant with the floor buttons.
+**▲/▼ semantics.** Real elevators put up/down on each floor (hall-call buttons), not in the car. Treating them as "hall call from the player's current floor with this preferred direction" is the reading I'd default to. Mostly only matters in M4 — pre-M4 they're inert.
 
 ### 5.5 Rendering
 
@@ -246,13 +245,13 @@ Single top-level state tree, updated per tick. Easy to serialize later.
 
 ## 7. Open Design Questions
 
-1. **▲/▼ panel button semantics.** Default: hall calls from the player's current floor. Mostly relevant in Phase 2.
-2. **Mid-trip button presses (Phase 1).** Ignore, override, or queue?
-3. **Goal loop.** What does the player *do* on floors? Sandbox, or objectives? ("Platformer" implies a gameplay verb beyond riding.)
-4. **Multiple elevators.** Single car for now. A bank-of-N is a significant dispatcher upgrade — defer.
-5. **Audio.** '90s elevator games live or die on the chimes. Worth scoping in early.
-6. **Save/load.** Less relevant with the fixed tower; revisit when/if floor contents become persistent.
-7. **Modal contents.** Door-open and door-close are intentionally **not** in the modal (door toggle is on the elevator picture). Confirm that's the intent — alternative is to put them in the modal too for accessibility / desktop play.
+1. **▲/▼ panel button semantics.** Default: hall calls from the player's current floor. Activates in M4.
+2. **Modal multi-press UX.** With the in-car queue (M2), the player will sometimes want to tap multiple floor buttons in one visit. Two options: (a) modal closes after each tap, player reopens to add more; (b) modal stays open until the player explicitly closes it, queued floors light up. (b) is more elevator-like; leaning that way.
+3. **Player visibility during M4 (NPC calls).** When the elevator leaves the player's floor to serve another call, the player's floor scrolls off-center while the camera follows the elevator. Acceptable, or do we want a fallback (picture-in-picture of the player, indicator arrow, dual-anchor camera)?
+4. **Goal loop.** What does the player *do* on floors? Sandbox, or objectives? ("Platformer" implies a gameplay verb beyond riding.)
+5. **Multiple elevators.** Single car for now. A bank-of-N is a significant dispatcher upgrade — defer.
+6. **Audio.** '90s elevator games live or die on the chimes. Worth scoping in early.
+7. **Save/load.** Less relevant with the fixed tower; revisit when/if floor contents become persistent.
 8. **Portrait vs landscape on phones.** The three-region layout assumes landscape-ish proportions. Worth deciding: lock orientation, or design a portrait variant.
 
 ## 8. Proposed Milestones
@@ -263,14 +262,14 @@ Canvas, scene manager, game loop, title → gameplay transition, region splittin
 **M1 — Static Tower + Elevator Rendering** (week 1)
 12 floors with sky/dirt backgrounds, shaft, elevator car at a fixed floor, panel + elevator pictures drawn (non-functional), keypad modal layout (non-functional).
 
-**M2 — Auto-Dispatch Elevator + Modal Wired Up** (week 2)
-Tap panel → keypad opens → tap floor → modal closes, doors close, car travels, doors open. Door toggle on elevator picture works. Emergency stop works. **No player yet** — proves the elevator mechanics.
+**M2 — Realistic Elevator + Modal Wired Up** (week 2)
+Tap panel → keypad opens → tap one or more floor buttons → car queues them and services in travel order (collective-selective for in-car requests). Lit-button visual state for queued floors. Door toggle on elevator picture works. Emergency stop works. **No player yet** — proves the elevator mechanics.
 
 **M3 — Player + Enter/Exit + Floor Walking** (week 3)
-Emoji player, walk-to-tap on current floor, ENTR/EXIT sub-buttons, player rides in car view. With M2's auto-dispatch, the core loop is now complete.
+Emoji player horizontally centered, walk-to-tap on current floor, ENTR/EXIT sub-buttons, player rides in car view. Camera follows the elevator vertically. Core loop complete.
 
-**M4 — Collective-Selective Queue (the "ideal" upgrade)**
-Replace auto-dispatch with the queueing dispatcher. Lit-button visual states for pending calls. Hall-call mechanic for ▲/▼.
+**M4 — Hall Calls + NPC Traffic**
+Add ▲/▼ hall-call mechanic from the player's current floor; introduce NPCs that generate external calls. The collective-selective dispatcher (already in place from M2) gets its full workout. Decide on player-visibility behavior when the car is dragged away (see §7 #3).
 
 **M5 — Title Screen ASCII Polish**
 ASCII control-panel title art, transitions, intro animation.

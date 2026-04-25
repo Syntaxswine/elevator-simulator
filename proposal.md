@@ -206,6 +206,10 @@ State:
 
 ### 5.4 Input System
 
+**Hit regions are decoupled from visual regions.** A button's drawn sprite is sized to fit the world (e.g. 1u to look right next to the elevator graphic), but its tap target is sized to fit a thumb (≥ ~44 px / 1.2–1.5u). The renderer draws the 1u sprite; the hit-tester checks against a separate, larger rectangle centered on it. This is the canonical way to keep small visual elements thumb-tappable without bloating the art.
+
+The same applies to floor-walk taps in the tower view — the player floor's tap region can extend slightly above and below the visible floor band so a sloppy tap still walks them.
+
 Hit-test dispatcher mapping screen taps to events:
 
 | Region | Tap action |
@@ -304,7 +308,7 @@ Single top-level state tree, updated per tick. Easy to serialize later.
 6. **Audio.** '90s elevator games live or die on the chimes. Worth scoping in early.
 7. **Save/load.** Less relevant with the fixed tower; revisit when/if floor contents become persistent.
 8. **Portrait vs landscape.** The bottom-1/3 layout works *better* the taller the screen is — portrait phones get 5–7 units of bottom region, landscape windows get ~2 units which gets tight for the elevator graphic + 1u buttons. Lock to portrait? Or design a fallback for short-and-wide?
-9. **1u touch-target size on small phones.** A 1u button on a 360-px-wide screen is 36 px square — below Apple's 44pt and Google's 48dp guidelines. Either accept it (the modal keypad has the truly thumb-sized buttons), enlarge the on-screen action buttons to e.g. 1.5u, or auto-enlarge below a width threshold.
+9. ~~1u touch-target size on small phones.~~ **Resolved**: hit region is independent of visual region (§5.4). The 1u button *art* stays small to look right next to the elevator; the *tap target* is sized for a thumb. No tradeoff.
 
 ## 8. Proposed Milestones
 

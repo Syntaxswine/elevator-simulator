@@ -4,6 +4,7 @@ import { buildTower } from './tower.js';
 import { createElevator } from './elevator.js';
 import { createPlayer } from './player.js';
 import { render } from './render.js';
+import { attachInput } from './input.js';
 import { DEFAULT_SEED } from './config.js';
 
 const canvas = document.getElementById('game');
@@ -42,8 +43,11 @@ async function start() {
     tower: buildTower(DEFAULT_SEED),
     elevator: createElevator(),
     player: createPlayer(),
+    modal: null,            // 'KEYPAD' | null
     assets,
   };
+
+  attachInput(canvas, gameState);
 
   function frame() {
     const layout = computeLayout(window.innerWidth, window.innerHeight);

@@ -22,31 +22,43 @@ export function render(ctx, layout, gameState) {
   renderTowerView(ctx, layout, gameState);
   renderIndicator(ctx, layout, gameState);
   renderBottomRegion(ctx, layout, gameState);
+
+  if (gameState.modal === 'KEYPAD') {
+    renderKeypadModal(ctx, layout, gameState);
+  }
 }
 
 // ---------- Top: floor indicator HUD ----------
 
 function renderIndicator(ctx, layout, gameState) {
   const { indicator } = layout;
+  const { assets, elevator } = gameState;
+
   ctx.save();
-  // Background bar
-  ctx.fillStyle = '#111';
+  // Background: black behind any letterboxing
+  ctx.fillStyle = '#000';
   ctx.fillRect(indicator.x, indicator.y, indicator.w, indicator.h);
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(indicator.x, indicator.y, indicator.w, indicator.h);
 
-  // Direction arrow + floor label, centered
-  const { elevator } = gameState;
+  // Floor-indicator graphic stretched to fill the strip
+  const indicatorImg = assets['floor-indicator'];
+  if (indicatorImg) {
+    ctx.drawImage(indicatorImg, indicator.x, indicator.y, indicator.w, indicator.h);
+  }
+
+  // Overlay: current floor label + direction arrow, centered.
+  // The graphic has a recessed display in the middle; the text sits on top of that.
   const label = FLOOR_LABELS[elevator.currentFloor] ?? '?';
-  const arrow = elevator.direction === 'UP' ? '▲' : elevator.direction === 'DOWN' ? '▼' : ' ';
-  const text = `${arrow}   ${label}`;
+  const arrow = elevator.direction === 'UP' ? '▲' : elevator.direction === 'DOWN' ? '▼' : '';
+  const text = arrow ? `${arrow} ${label}` : label;
 
-  ctx.fillStyle = '#ff7733';  // amber 90s seven-segment vibe
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const fontPx = Math.floor(indicator.h * 0.6);
-  ctx.font = `bold ${fontPx}px monospace`;
+  const fontPx = Math.floor(indicator.h * 0.55);
+  ctx.font = `bold ${fontPx}px "Courier New", monospace`;
+  // Shadow for legibility regardless of underlying graphic
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillText(text, indicator.x + indicator.w / 2 + 2, indicator.y + indicator.h / 2 + 2);
+  ctx.fillStyle = '#ffd060';
   ctx.fillText(text, indicator.x + indicator.w / 2, indicator.y + indicator.h / 2);
   ctx.restore();
 }
@@ -231,8 +243,12 @@ function renderBottomRegion(ctx, layout, gameState) {
     h: unitSizePx,
   }, 'IN/OUT');
 
-  // --- Bottom-right: control-panel placeholder (canvas-drawn) ---
-  drawPanelPlaceholder(ctx, bottomRight, unitSizePx);
+  // --- Bottom-right: control-panel face (elevator-button.png, contained) ---
+  ctx.fillStyle = '#0e0e12';
+  ctx.fillRect(bottomRight.x, bottomRight.y, bottomRight.w, bottomRight.h);
+  if (assets['elevator-button']) {
+    drawImageContain(ctx, assets['elevator-button'], bottomRight);
+  }
 }
 
 function drawImageContain(ctx, img, area) {
@@ -265,6 +281,35 @@ function drawActionButton(ctx, rect, label) {
   ctx.textBaseline = 'middle';
   ctx.font = `bold ${Math.floor(rect.h * 0.28)}px sans-serif`;
   ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  ctx.restore();
+}
+
+// ---------- Modal: keypad ----------
+
+function renderKeypadModal(ctx, layout, gameState) {
+  const { canvasWidth, canvasHeight, unitSizePx } = layout;
+  // Dim everything behind the modal
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  // Expanded keypad (placeholder dot grid, scaled up)
+  const margin = Math.min(canvasWidth, canvasHeight) * 0.06;
+  const area = {
+    x: margin,
+    y: margin + unitSizePx,                 // leave room for "tap to close" hint at top
+    w: canvasWidth - margin * 2,
+    h: canvasHeight - margin * 2 - unitSizePx,
+  };
+  drawPanelPlaceholder(ctx, area, unitSizePx);
+
+  // Tap-anywhere-to-close hint
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const fontPx = Math.max(12, Math.floor(unitSizePx * 0.35));
+  ctx.font = `bold ${fontPx}px monospace`;
+  ctx.fillText('TAP ANYWHERE TO CLOSE', canvasWidth / 2, fontPx * 0.4);
   ctx.restore();
 }
 
@@ -303,13 +348,5 @@ function drawPanelPlaceholder(ctx, area, unitSizePx) {
       ctx.stroke();
     }
   }
-
-  // "TAP TO OPEN" hint (bottom)
-  ctx.fillStyle = '#f0c894';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  const hintFont = Math.max(10, Math.floor(unitSizePx * 0.25));
-  ctx.font = `bold ${hintFont}px monospace`;
-  ctx.fillText('TAP TO OPEN', area.x + area.w / 2, area.y + area.h - 6);
   ctx.restore();
 }

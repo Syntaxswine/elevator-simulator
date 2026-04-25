@@ -8,8 +8,9 @@ export const ASSET_MANIFEST = {
   'office-2':        'assets/office-2.png',
   'office-3':        'assets/office-3.png',
   player:            'assets/player.png',
-  'elevator-button': 'assets/elevator-button.png',
-  'floor-indicator': 'assets/floor-indicator.png',
+  'elevator-button':        'assets/elevator-button.png',
+  'floor-indicator':        'assets/floor-indicator.png',
+  'elevator-current-floor': 'assets/elevator-current-floor.png',
 };
 
 export async function loadAssets() {

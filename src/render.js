@@ -160,16 +160,26 @@ function drawFloors(ctx, layout, cameraY, towerModel, elevator, assets) {
     if (shaftTile) {
       ctx.drawImage(shaftTile, shaftX, yTop, shaftW, h);
 
-      // Doors-open visual: when this is the elevator's current floor and
-      // doors are at least partially open, paint a dark "interior" rect
-      // that grows with doorProgress.
+      // Doors-open visual: at the elevator's current floor, reveal the
+      // interior image (centered horizontally) with width scaled by
+      // doorProgress, simulating doors sliding apart from the middle.
       if (i === elevatorFloor && elevator.doorProgress > 0) {
-        const interiorW = shaftW * 0.7 * elevator.doorProgress;
-        const interiorH = h * 0.7;
+        const interior = assets['elevator-current-floor'];
+        const visibleW = shaftW * elevator.doorProgress;
         const cx = shaftX + shaftW / 2;
-        const interiorY = yTop + (h - interiorH) * 0.7;  // bias toward floor (bottom)
-        ctx.fillStyle = '#0d0d18';
-        ctx.fillRect(cx - interiorW / 2, interiorY, interiorW, interiorH);
+        const dx = cx - visibleW / 2;
+        if (interior) {
+          // Source-rect width matches doorProgress so the interior image
+          // is unveiled from its center outward, not stretched.
+          const srcW = interior.width * elevator.doorProgress;
+          const srcX = (interior.width - srcW) / 2;
+          ctx.drawImage(interior,
+            srcX, 0, srcW, interior.height,
+            dx, yTop, visibleW, h);
+        } else {
+          ctx.fillStyle = '#0d0d18';
+          ctx.fillRect(dx, yTop, visibleW, h);
+        }
       }
     }
   }

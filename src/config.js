@@ -35,7 +35,7 @@ export const DEFAULT_SEED = 1337;
 // Elevator physics & timing
 export const ELEVATOR_SPEED = 2.0;             // floors per second (cruise)
 export const DOOR_TRANSITION_MS = 800;          // open / close animation duration
-export const DOOR_DWELL_MS = 2500;              // doors stay open before auto-close
+export const DOOR_DWELL_MS = 4000;              // doors stay open before auto-close (long enough for multiple NPCs to board/exit)
 export const ARRIVAL_EPSILON = 0.001;           // floors
 
 // Player movement

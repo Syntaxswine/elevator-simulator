@@ -16,7 +16,10 @@ const NPC_COLORS = [
 
 const SHAFT_CENTER = SHAFT_LEFT_X + SHAFT_WIDTH_UNITS / 2;        // 5.0
 const NPC_SPEED = PLAYER_SPEED * 0.7;
-const NPC_BOARD_X_RANGE = 0.6;   // NPCs spread within +/- 0.3u of shaft center while in elevator
+// In-elevator riders cluster in a 3-column grid; columns spaced so figures
+// don't overlap (each figure is ~0.18u wide at half-size).
+const NPC_BOARD_COLS = 3;
+const NPC_BOARD_COL_SPACING = 0.25;
 
 let nextId = 1;
 
@@ -100,8 +103,8 @@ export function isNpcVisible(npc, elevator) {
 // Render position helpers — used by render.js to handle the in-elevator case.
 export function npcRenderXUnits(npc, indexInElevator = 0) {
   if (npc.state === 'IN_ELEVATOR') {
-    // Spread multiple riders within the shaft tile
-    const offset = (indexInElevator - 0.5) * (NPC_BOARD_X_RANGE / 2);
+    const col = indexInElevator % NPC_BOARD_COLS;
+    const offset = (col - (NPC_BOARD_COLS - 1) / 2) * NPC_BOARD_COL_SPACING;
     return SHAFT_CENTER + offset;
   }
   return npc.xOffset;

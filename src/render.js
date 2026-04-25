@@ -19,12 +19,91 @@ export function render(ctx, layout, gameState) {
   const { canvasWidth, canvasHeight } = layout;
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
+  if (gameState.scene === 'TITLE') {
+    renderTitleScreen(ctx, layout);
+    return;
+  }
+
   renderTowerView(ctx, layout, gameState);
   renderIndicator(ctx, layout, gameState);
   renderBottomRegion(ctx, layout, gameState);
 
   if (gameState.modal === 'KEYPAD') {
     renderKeypadModal(ctx, layout, gameState);
+  }
+}
+
+// ---------- Title screen ----------
+
+const TITLE_PANEL_LINES = [
+  '╔═══════════════╗',
+  '║ ┌───────────┐ ║',
+  '║ │     L     │ ║',
+  '║ └───────────┘ ║',
+  '║               ║',
+  '║ ┌──┬──┬──┐    ║',
+  '║ │ 8│ 9│10│    ║',
+  '║ ├──┼──┼──┤    ║',
+  '║ │ 5│ 6│ 7│    ║',
+  '║ ├──┼──┼──┤    ║',
+  '║ │ 2│ 3│ 4│    ║',
+  '║ ├──┼──┼──┤    ║',
+  '║ │SB│ B│ L│    ║',
+  '║ └──┴──┴──┘    ║',
+  '║               ║',
+  '║  ◁   ▷    ⊘   ║',
+  '╚═══════════════╝',
+];
+
+function renderTitleScreen(ctx, layout) {
+  const { canvasWidth, canvasHeight } = layout;
+
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  // Title block
+  const titleSize = Math.floor(canvasWidth * 0.07);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${titleSize}px "Courier New", monospace`;
+  // Drop shadow + amber fill
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText('ELEVATOR', canvasWidth / 2 + 3, canvasHeight * 0.07 + 3);
+  ctx.fillStyle = '#ffd060';
+  ctx.fillText('ELEVATOR', canvasWidth / 2, canvasHeight * 0.07);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText('SIMULATOR', canvasWidth / 2 + 3, canvasHeight * 0.07 + titleSize + 3);
+  ctx.fillStyle = '#ffd060';
+  ctx.fillText('SIMULATOR', canvasWidth / 2, canvasHeight * 0.07 + titleSize);
+
+  // ASCII control-panel art
+  const lineCount = TITLE_PANEL_LINES.length;
+  const maxLineLen = Math.max(...TITLE_PANEL_LINES.map(l => l.length));
+  // Fit the art to ~70% width and ~50% height
+  const charW = (canvasWidth * 0.7) / maxLineLen;
+  const lineH = Math.min(charW * 1.4, (canvasHeight * 0.50) / lineCount);
+  const charPx = Math.floor(lineH);
+  ctx.font = `${charPx}px "Courier New", monospace`;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+  const artStartY = canvasHeight * 0.27;
+  ctx.fillStyle = '#52ff66';   // green CRT vibe for the art
+  for (let i = 0; i < lineCount; i++) {
+    ctx.fillText(TITLE_PANEL_LINES[i], canvasWidth / 2, artStartY + i * lineH);
+  }
+
+  // Blinking "TAP TO START" — 1Hz
+  const blink = (Math.floor(performance.now() / 500) % 2) === 0;
+  const startSize = Math.floor(canvasWidth * 0.045);
+  ctx.font = `bold ${startSize}px "Courier New", monospace`;
+  const startY = canvasHeight * 0.88;
+  if (blink) {
+    ctx.fillStyle = '#ffd060';
+    ctx.fillText('TAP TO START_', canvasWidth / 2, startY);
+  } else {
+    ctx.fillStyle = '#ffd060';
+    ctx.fillText('TAP TO START',  canvasWidth / 2, startY);
   }
 }
 

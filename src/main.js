@@ -40,6 +40,7 @@ async function start() {
   }
 
   const gameState = {
+    scene: 'TITLE',         // 'TITLE' | 'GAMEPLAY'
     tower: buildTower(DEFAULT_SEED),
     elevator: createElevator(),
     player: createPlayer(),
@@ -56,8 +57,10 @@ async function start() {
   function frame(now) {
     const dt = Math.min(50, now - lastTime);
     lastTime = now;
-    updateElevator(gameState.elevator, dt);
-    updatePlayer(gameState.player, dt);
+    if (gameState.scene === 'GAMEPLAY') {
+      updateElevator(gameState.elevator, dt);
+      updatePlayer(gameState.player, dt);
+    }
     const layout = computeLayout(window.innerWidth, window.innerHeight);
     render(ctx, layout, gameState);
     requestAnimationFrame(frame);

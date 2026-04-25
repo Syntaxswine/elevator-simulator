@@ -23,6 +23,12 @@ export function attachInput(canvas, gameState) {
     const p = pointFromEvent(ev);
     const tapPad = layout.unitSizePx * 0.25;
 
+    // Title screen: any tap starts the game.
+    if (gameState.scene === 'TITLE') {
+      gameState.scene = 'GAMEPLAY';
+      return;
+    }
+
     // Modal open: floor button (queue + stay open) or anywhere else (close).
     if (gameState.modal === 'KEYPAD') {
       const modalArea = computeKeypadModalArea(layout);

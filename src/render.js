@@ -10,9 +10,9 @@ import {
 } from './config.js';
 import { towerYToScreenY, towerXToScreenX } from './layout.js';
 import { isPlayerVisible } from './player.js';
+import { getCurrentFloor, isFloorCalled } from './elevator.js';
 
-// Background tile size (in units). Sky/dirt tiles are large hi-res images;
-// rendering one tile per 4u feels closer to their authored scale than 1u.
+// Background tile size (in units). Sky/dirt are large tileable images.
 const BG_TILE_UNITS = 4;
 
 export function render(ctx, layout, gameState) {
@@ -35,27 +35,25 @@ function renderIndicator(ctx, layout, gameState) {
   const { assets, elevator } = gameState;
 
   ctx.save();
-  // Background: black behind any letterboxing
   ctx.fillStyle = '#000';
   ctx.fillRect(indicator.x, indicator.y, indicator.w, indicator.h);
 
-  // Floor-indicator graphic stretched to fill the strip
   const indicatorImg = assets['floor-indicator'];
   if (indicatorImg) {
     ctx.drawImage(indicatorImg, indicator.x, indicator.y, indicator.w, indicator.h);
   }
 
-  // Overlay: current floor label + direction arrow, centered.
-  // The graphic has a recessed display in the middle; the text sits on top of that.
-  const label = FLOOR_LABELS[elevator.currentFloor] ?? '?';
-  const arrow = elevator.direction === 'UP' ? '▲' : elevator.direction === 'DOWN' ? '▼' : '';
+  // Live floor — derived from continuous position, ticks at thresholds.
+  const label = FLOOR_LABELS[getCurrentFloor(elevator)] ?? '?';
+  const arrow =
+    elevator.direction === 'UP' ? '▲' :
+    elevator.direction === 'DOWN' ? '▼' : '';
   const text = arrow ? `${arrow} ${label}` : label;
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const fontPx = Math.floor(indicator.h * 0.55);
   ctx.font = `bold ${fontPx}px "Courier New", monospace`;
-  // Shadow for legibility regardless of underlying graphic
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillText(text, indicator.x + indicator.w / 2 + 2, indicator.y + indicator.h / 2 + 2);
   ctx.fillStyle = '#ffd060';
@@ -66,23 +64,18 @@ function renderIndicator(ctx, layout, gameState) {
 // ---------- Middle: tower view ----------
 
 function renderTowerView(ctx, layout, gameState) {
-  const { tower: rect, unitSizePx } = layout;
+  const { tower: rect } = layout;
   const { tower: towerModel, elevator, player, assets } = gameState;
-  const cameraY = elevator.position + 0.5;  // center on car middle (floor + 0.5)
+  const cameraY = elevator.position + 0.5;  // center on car middle
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
   ctx.clip();
 
-  // 1) Sky / dirt backgrounds (full clip area, split at ground line)
   drawSkyAndDirt(ctx, layout, cameraY, assets);
+  drawFloors(ctx, layout, cameraY, towerModel, elevator, assets);
 
-  // 2) Floors: corridors (left + right) and shaft facade (elevator-bank at every floor).
-  // No solid walls — the 0.5u air strips on each side of the corridors stay sky/dirt.
-  drawFloors(ctx, layout, cameraY, towerModel, assets);
-
-  // 3) Player sprite if visible
   if (isPlayerVisible(player, elevator)) {
     drawPlayer(ctx, layout, cameraY, player, elevator, assets);
   }
@@ -94,7 +87,6 @@ function drawSkyAndDirt(ctx, layout, cameraY, assets) {
   const { tower: rect, unitSizePx } = layout;
   const groundScreenY = towerYToScreenY(GROUND_LINE_Y, layout, cameraY);
 
-  // Each region: build a pattern, scaled so the source image fills BG_TILE_UNITS units.
   drawTiledRegion(ctx, assets.sky,
     rect.x, rect.y,
     rect.w, Math.max(0, groundScreenY - rect.y),
@@ -106,7 +98,6 @@ function drawSkyAndDirt(ctx, layout, cameraY, assets) {
     unitSizePx * BG_TILE_UNITS);
 }
 
-// Tiles `image` to fill the rect, at the requested tile pixel size.
 function drawTiledRegion(ctx, image, x, y, w, h, tileSizePx) {
   if (w <= 0 || h <= 0) return;
   if (!image || image.width === 0) {
@@ -120,9 +111,7 @@ function drawTiledRegion(ctx, image, x, y, w, h, tileSizePx) {
     ctx.fillRect(x, y, w, h);
     return;
   }
-  // Scale: pattern source pixel → tileSizePx / image.width screen pixels
   const scale = tileSizePx / image.width;
-  // Use setTransform if supported; otherwise fall back to manual transform on ctx.
   if (typeof DOMMatrix !== 'undefined' && pattern.setTransform) {
     pattern.setTransform(new DOMMatrix().translateSelf(x, y).scaleSelf(scale));
     ctx.fillStyle = pattern;
@@ -137,7 +126,7 @@ function drawTiledRegion(ctx, image, x, y, w, h, tileSizePx) {
   }
 }
 
-function drawFloors(ctx, layout, cameraY, towerModel, assets) {
+function drawFloors(ctx, layout, cameraY, towerModel, elevator, assets) {
   const { unitSizePx } = layout;
   const halfTowerHeightUnits = layout.tower.h / (2 * unitSizePx);
   const minFloor = Math.max(0, Math.floor(cameraY - halfTowerHeightUnits) - 1);
@@ -149,6 +138,7 @@ function drawFloors(ctx, layout, cameraY, towerModel, assets) {
   const rightX = towerXToScreenX(RIGHT_CORRIDOR_X, layout);
   const shaftX = towerXToScreenX(SHAFT_LEFT_X, layout);
   const shaftTile = assets['elevator-bank'];
+  const elevatorFloor = getCurrentFloor(elevator);
 
   for (let i = minFloor; i <= maxFloor; i++) {
     const floor = towerModel.floors[i];
@@ -158,10 +148,8 @@ function drawFloors(ctx, layout, cameraY, towerModel, assets) {
     const yBottom = towerYToScreenY(i, layout, cameraY);
     const h = yBottom - yTop;
 
-    // Left corridor
     if (corridorTile) {
       ctx.drawImage(corridorTile, leftX, yTop, corridorW, h);
-      // Right corridor: same tile, mirrored
       ctx.save();
       ctx.translate(rightX + corridorW, yTop);
       ctx.scale(-1, 1);
@@ -169,9 +157,20 @@ function drawFloors(ctx, layout, cameraY, towerModel, assets) {
       ctx.restore();
     }
 
-    // Shaft facade — same elevator-bank tile at every floor (double-use asset)
     if (shaftTile) {
       ctx.drawImage(shaftTile, shaftX, yTop, shaftW, h);
+
+      // Doors-open visual: when this is the elevator's current floor and
+      // doors are at least partially open, paint a dark "interior" rect
+      // that grows with doorProgress.
+      if (i === elevatorFloor && elevator.doorProgress > 0) {
+        const interiorW = shaftW * 0.7 * elevator.doorProgress;
+        const interiorH = h * 0.7;
+        const cx = shaftX + shaftW / 2;
+        const interiorY = yTop + (h - interiorH) * 0.7;  // bias toward floor (bottom)
+        ctx.fillStyle = '#0d0d18';
+        ctx.fillRect(cx - interiorW / 2, interiorY, interiorW, interiorH);
+      }
     }
   }
 }
@@ -183,23 +182,21 @@ function drawPlayer(ctx, layout, cameraY, player, elevator, assets) {
 
   let centerXUnits, baseYUnits, heightUnits;
   if (player.state === 'IN_ELEVATOR') {
-    // Inside the shaft tile — shrunk to ~0.7u tall
     centerXUnits = SHAFT_LEFT_X + SHAFT_WIDTH_UNITS / 2;
     baseYUnits = elevator.position;
     heightUnits = 0.7;
   } else {
     centerXUnits = player.xOffset;
     baseYUnits = player.floor;
-    heightUnits = 0.9;  // slightly less than 1u to leave headroom on the floor
+    heightUnits = 0.9;
   }
 
-  // Maintain sprite aspect ratio (image is taller than wide)
   const aspect = sprite.width / sprite.height;
   const heightPx = heightUnits * unitSizePx;
   const widthPx = heightPx * aspect;
 
   const screenCenterX = towerXToScreenX(centerXUnits, layout);
-  const screenBaseY = towerYToScreenY(baseYUnits, layout, cameraY);  // floor's bottom = sprite's feet
+  const screenBaseY = towerYToScreenY(baseYUnits, layout, cameraY);
   ctx.drawImage(sprite, screenCenterX - widthPx / 2, screenBaseY - heightPx, widthPx, heightPx);
 }
 
@@ -209,12 +206,10 @@ function renderBottomRegion(ctx, layout, gameState) {
   const { bottomLeft, bottomRight, unitSizePx } = layout;
   const { assets } = gameState;
 
-  // Backdrop
   ctx.fillStyle = '#0e0e12';
   ctx.fillRect(layout.bottom.x, layout.bottom.y, layout.bottom.w, layout.bottom.h);
 
-  // --- Bottom-left: elevator-bank close-up ---
-  // Fit the elevator-bank image into the bottom-left region, leaving a 1u strip at the bottom for buttons
+  // Bottom-left: elevator-bank close-up + 1u action buttons
   const buttonStripH = unitSizePx;
   const closeupArea = {
     x: bottomLeft.x,
@@ -228,8 +223,6 @@ function renderBottomRegion(ctx, layout, gameState) {
     ctx.fillStyle = '#222';
     ctx.fillRect(closeupArea.x, closeupArea.y, closeupArea.w, closeupArea.h);
   }
-
-  // 1u Open/Close button + 1u In/Out button, side by side
   drawActionButton(ctx, {
     x: bottomLeft.x + bottomLeft.w / 2 - unitSizePx - unitSizePx * 0.25,
     y: closeupArea.y + closeupArea.h + (buttonStripH - unitSizePx) / 2,
@@ -243,7 +236,7 @@ function renderBottomRegion(ctx, layout, gameState) {
     h: unitSizePx,
   }, 'IN/OUT');
 
-  // --- Bottom-right: control-panel face (elevator-button.png, contained) ---
+  // Bottom-right: control-panel face (elevator-button.png contained)
   ctx.fillStyle = '#0e0e12';
   ctx.fillRect(bottomRight.x, bottomRight.y, bottomRight.w, bottomRight.h);
   if (assets['elevator-button']) {
@@ -270,7 +263,6 @@ function drawImageContain(ctx, img, area) {
 
 function drawActionButton(ctx, rect, label) {
   ctx.save();
-  // Brushed-metal-ish background
   ctx.fillStyle = '#2a2e36';
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
   ctx.strokeStyle = '#666';
@@ -286,35 +278,60 @@ function drawActionButton(ctx, rect, label) {
 
 // ---------- Modal: keypad ----------
 
+// Returns the rectangle that the modal occupies on screen.
+export function computeKeypadModalArea(layout) {
+  const { canvasWidth, canvasHeight, unitSizePx } = layout;
+  const margin = Math.min(canvasWidth, canvasHeight) * 0.06;
+  return {
+    x: margin,
+    y: margin + unitSizePx,                        // leave room for the close hint at top
+    w: canvasWidth - margin * 2,
+    h: canvasHeight - margin * 2 - unitSizePx,
+  };
+}
+
+// Returns an array of { position, floorIndex, label, rect } for the 4×3 grid.
+// Layout: position 1 (SB) bottom-left → position 12 ("10") top-right.
+export function computeKeypadButtons(modalArea) {
+  const cols = 3;
+  const rows = 4;
+  const padX = modalArea.w * 0.08;
+  const padY = modalArea.h * 0.08;
+  const gridX = modalArea.x + padX;
+  const gridY = modalArea.y + padY;
+  const gridW = modalArea.w - padX * 2;
+  const gridH = modalArea.h - padY * 2;
+  const cellW = gridW / cols;
+  const cellH = gridH / rows;
+
+  const buttons = [];
+  for (let p = 1; p <= 12; p++) {
+    const floorIndex = p - 1;
+    const label = FLOOR_LABELS[floorIndex];
+    const mathRow = Math.floor((p - 1) / 3);   // 0 = bottom row
+    const col = (p - 1) % 3;
+    const displayRow = (rows - 1) - mathRow;   // 0 = top of screen
+    const rect = {
+      x: gridX + col * cellW + cellW * 0.1,
+      y: gridY + displayRow * cellH + cellH * 0.1,
+      w: cellW * 0.8,
+      h: cellH * 0.8,
+    };
+    buttons.push({ position: p, floorIndex, label, rect });
+  }
+  return buttons;
+}
+
 function renderKeypadModal(ctx, layout, gameState) {
   const { canvasWidth, canvasHeight, unitSizePx } = layout;
-  // Dim everything behind the modal
+  const { elevator } = gameState;
+
   ctx.save();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // Expanded keypad (placeholder dot grid, scaled up)
-  const margin = Math.min(canvasWidth, canvasHeight) * 0.06;
-  const area = {
-    x: margin,
-    y: margin + unitSizePx,                 // leave room for "tap to close" hint at top
-    w: canvasWidth - margin * 2,
-    h: canvasHeight - margin * 2 - unitSizePx,
-  };
-  drawPanelPlaceholder(ctx, area, unitSizePx);
+  const area = computeKeypadModalArea(layout);
 
-  // Tap-anywhere-to-close hint
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  const fontPx = Math.max(12, Math.floor(unitSizePx * 0.35));
-  ctx.font = `bold ${fontPx}px monospace`;
-  ctx.fillText('TAP ANYWHERE TO CLOSE', canvasWidth / 2, fontPx * 0.4);
-  ctx.restore();
-}
-
-function drawPanelPlaceholder(ctx, area, unitSizePx) {
-  ctx.save();
   // Frame
   ctx.fillStyle = '#3a2722';
   ctx.fillRect(area.x, area.y, area.w, area.h);
@@ -322,31 +339,60 @@ function drawPanelPlaceholder(ctx, area, unitSizePx) {
   ctx.lineWidth = 3;
   ctx.strokeRect(area.x + 6, area.y + 6, area.w - 12, area.h - 12);
 
-  // Faux button grid (decorative — actual interaction will open the modal keypad)
-  const cols = 3;
-  const rows = 4;
-  const padX = unitSizePx * 0.5;
-  const padY = unitSizePx * 0.5;
-  const gridX = area.x + padX;
-  const gridY = area.y + padY;
-  const gridW = area.w - padX * 2;
-  const gridH = area.h - padY * 2;
-  const cellW = gridW / cols;
-  const cellH = gridH / rows;
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const cx = gridX + c * cellW + cellW / 2;
-      const cy = gridY + r * cellH + cellH / 2;
-      const radius = Math.min(cellW, cellH) * 0.32;
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#c9a574';
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#5a3e22';
-      ctx.stroke();
-    }
+  // Buttons
+  const buttons = computeKeypadButtons(area);
+  for (const btn of buttons) {
+    drawKeypadButton(ctx, btn.rect, btn.label, isFloorCalled(elevator, btn.floorIndex));
   }
+
+  // Close hint
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const fontPx = Math.max(12, Math.floor(unitSizePx * 0.35));
+  ctx.font = `bold ${fontPx}px monospace`;
+  ctx.fillText('TAP OUTSIDE BUTTONS TO CLOSE', canvasWidth / 2, fontPx * 0.4);
+  ctx.restore();
+}
+
+function drawKeypadButton(ctx, rect, label, lit) {
+  ctx.save();
+  // Recessed bezel
+  ctx.fillStyle = '#2c1d12';
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+
+  const inset = Math.min(rect.w, rect.h) * 0.10;
+  const bx = rect.x + inset, by = rect.y + inset;
+  const bw = rect.w - inset * 2, bh = rect.h - inset * 2;
+
+  if (lit) {
+    // Lemon-yellow glowing button
+    ctx.save();
+    ctx.shadowColor = '#fff44f';
+    ctx.shadowBlur = Math.max(bw, bh) * 0.45;
+    const grad = ctx.createRadialGradient(
+      bx + bw / 2, by + bh / 2, 0,
+      bx + bw / 2, by + bh / 2, Math.max(bw, bh) / 2
+    );
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.5, '#fff44f');   // lemon yellow
+    grad.addColorStop(1, '#e8d100');
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#c9a574';
+    ctx.fillRect(bx, by, bw, bh);
+  }
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = lit ? '#fffacd' : '#5a3e22';
+  ctx.strokeRect(bx, by, bw, bh);
+
+  ctx.fillStyle = lit ? '#3a2a00' : '#3a2010';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const fontPx = Math.floor(Math.min(bw, bh) * 0.45);
+  ctx.font = `bold ${fontPx}px monospace`;
+  ctx.fillText(label, bx + bw / 2, by + bh / 2);
   ctx.restore();
 }

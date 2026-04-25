@@ -1,7 +1,7 @@
 import { loadAssets } from './assets.js';
 import { computeLayout } from './layout.js';
 import { buildTower } from './tower.js';
-import { createElevator } from './elevator.js';
+import { createElevator, updateElevator } from './elevator.js';
 import { createPlayer } from './player.js';
 import { render } from './render.js';
 import { attachInput } from './input.js';
@@ -49,7 +49,14 @@ async function start() {
 
   attachInput(canvas, gameState);
 
-  function frame() {
+  // Debug hook (harmless in production; lets the preview eval inspect state)
+  window.__gs = gameState;
+
+  let lastTime = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - lastTime);   // clamp dt to prevent big jumps
+    lastTime = now;
+    updateElevator(gameState.elevator, dt);
     const layout = computeLayout(window.innerWidth, window.innerHeight);
     render(ctx, layout, gameState);
     requestAnimationFrame(frame);

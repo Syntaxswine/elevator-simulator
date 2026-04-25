@@ -190,15 +190,16 @@ function drawPlayer(ctx, layout, cameraY, player, elevator, assets) {
   if (!sprite) return;
   const { unitSizePx } = layout;
 
+  const ON_FLOOR_HEIGHT = 0.9;
   let centerXUnits, baseYUnits, heightUnits;
   if (player.state === 'IN_ELEVATOR') {
     centerXUnits = SHAFT_LEFT_X + SHAFT_WIDTH_UNITS / 2;
     baseYUnits = elevator.position;
-    heightUnits = 0.7;
+    heightUnits = ON_FLOOR_HEIGHT * 0.5;   // half size in the elevator
   } else {
     centerXUnits = player.xOffset;
     baseYUnits = player.floor;
-    heightUnits = 0.9;
+    heightUnits = ON_FLOOR_HEIGHT;
   }
 
   const aspect = sprite.width / sprite.height;
@@ -211,6 +212,21 @@ function drawPlayer(ctx, layout, cameraY, player, elevator, assets) {
 }
 
 // ---------- Bottom: elevator close-up + control panel ----------
+
+// Returns the rects of the two 1u action buttons (Open/Close, In/Out)
+// in the bottom-left region. Used by both render and input.
+export function computeActionButtonRects(layout) {
+  const { bottomLeft, unitSizePx } = layout;
+  const buttonStripH = unitSizePx;
+  const closeupAreaH = Math.max(0, bottomLeft.h - buttonStripH);
+  const buttonY = bottomLeft.y + closeupAreaH + (buttonStripH - unitSizePx) / 2;
+  const ocX = bottomLeft.x + bottomLeft.w / 2 - unitSizePx - unitSizePx * 0.25;
+  const ioX = bottomLeft.x + bottomLeft.w / 2 + unitSizePx * 0.25;
+  return {
+    openClose: { x: ocX, y: buttonY, w: unitSizePx, h: unitSizePx },
+    inOut:     { x: ioX, y: buttonY, w: unitSizePx, h: unitSizePx },
+  };
+}
 
 function renderBottomRegion(ctx, layout, gameState) {
   const { bottomLeft, bottomRight, unitSizePx } = layout;
@@ -233,18 +249,9 @@ function renderBottomRegion(ctx, layout, gameState) {
     ctx.fillStyle = '#222';
     ctx.fillRect(closeupArea.x, closeupArea.y, closeupArea.w, closeupArea.h);
   }
-  drawActionButton(ctx, {
-    x: bottomLeft.x + bottomLeft.w / 2 - unitSizePx - unitSizePx * 0.25,
-    y: closeupArea.y + closeupArea.h + (buttonStripH - unitSizePx) / 2,
-    w: unitSizePx,
-    h: unitSizePx,
-  }, 'O/C');
-  drawActionButton(ctx, {
-    x: bottomLeft.x + bottomLeft.w / 2 + unitSizePx * 0.25,
-    y: closeupArea.y + closeupArea.h + (buttonStripH - unitSizePx) / 2,
-    w: unitSizePx,
-    h: unitSizePx,
-  }, 'IN/OUT');
+  const buttons = computeActionButtonRects(layout);
+  drawActionButton(ctx, buttons.openClose, 'O/C');
+  drawActionButton(ctx, buttons.inOut, 'IN/OUT');
 
   // Bottom-right: control-panel face (elevator-button.png contained)
   ctx.fillStyle = '#0e0e12';

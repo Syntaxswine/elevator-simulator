@@ -37,3 +37,8 @@ export const ELEVATOR_SPEED = 2.0;             // floors per second (cruise)
 export const DOOR_TRANSITION_MS = 800;          // open / close animation duration
 export const DOOR_DWELL_MS = 2500;              // doors stay open before auto-close
 export const ARRIVAL_EPSILON = 0.001;           // floors
+
+// Player movement
+export const PLAYER_SPEED = 4.0;                // units per second (horizontal slide)
+export const PLAYER_X_MIN = WALL_WIDTH_UNITS + 0.2;
+export const PLAYER_X_MAX = TOWER_WIDTH_UNITS - WALL_WIDTH_UNITS - 0.2;

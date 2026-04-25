@@ -2,7 +2,7 @@ import { loadAssets } from './assets.js';
 import { computeLayout } from './layout.js';
 import { buildTower } from './tower.js';
 import { createElevator, updateElevator } from './elevator.js';
-import { createPlayer } from './player.js';
+import { createPlayer, updatePlayer } from './player.js';
 import { render } from './render.js';
 import { attachInput } from './input.js';
 import { DEFAULT_SEED } from './config.js';
@@ -54,9 +54,10 @@ async function start() {
 
   let lastTime = performance.now();
   function frame(now) {
-    const dt = Math.min(50, now - lastTime);   // clamp dt to prevent big jumps
+    const dt = Math.min(50, now - lastTime);
     lastTime = now;
     updateElevator(gameState.elevator, dt);
+    updatePlayer(gameState.player, dt);
     const layout = computeLayout(window.innerWidth, window.innerHeight);
     render(ctx, layout, gameState);
     requestAnimationFrame(frame);

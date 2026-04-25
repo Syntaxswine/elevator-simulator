@@ -39,6 +39,30 @@ export function isFloorCalled(elevator, floorIndex) {
   return elevator.carCalls.has(floorIndex) || elevator.target === floorIndex;
 }
 
+// Player taps the Open/Close button. Toggles between opening and closing
+// based on current state. Real elevators let you reverse mid-animation.
+// No-op while moving.
+export function toggleDoor(elevator) {
+  switch (elevator.state) {
+    case 'IDLE':
+      transitionTo(elevator, 'DOORS_OPENING');
+      break;
+    case 'DOORS_OPEN':
+      transitionTo(elevator, 'DOORS_CLOSING');
+      break;
+    case 'DOORS_OPENING':
+      elevator.state = 'DOORS_CLOSING';
+      break;
+    case 'DOORS_CLOSING':
+      elevator.state = 'DOORS_OPENING';
+      break;
+    case 'MOVING_UP':
+    case 'MOVING_DOWN':
+      // Cannot open doors while moving
+      break;
+  }
+}
+
 // Player presses a floor button.
 export function processCall(elevator, floorIndex) {
   if (floorIndex < 0 || floorIndex >= FLOOR_COUNT) return;

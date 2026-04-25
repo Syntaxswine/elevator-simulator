@@ -1,10 +1,14 @@
-import { computeLayout } from './layout.js';
-import { computeKeypadModalArea, computeKeypadButtons } from './render.js';
-import { processCall } from './elevator.js';
+import { computeLayout, screenYToTowerY, screenXToTowerX } from './layout.js';
+import {
+  computeKeypadModalArea,
+  computeKeypadButtons,
+  computeActionButtonRects,
+} from './render.js';
+import { processCall, toggleDoor } from './elevator.js';
+import { setWalkTarget, toggleInOut } from './player.js';
 
-// Pointer hit-tester. Reads canvas-relative pointer coords and dispatches
-// to handlers based on which region was tapped. Hit regions are layout-aware
-// and recomputed each tap (since the layout can change on resize).
+// Pointer hit-tester. Hit regions can be larger than visual regions per the
+// proposal; small 1u buttons get a thumb-friendly tap-pad expansion.
 export function attachInput(canvas, gameState) {
   function pointFromEvent(ev) {
     const rect = canvas.getBoundingClientRect();
@@ -17,24 +21,47 @@ export function attachInput(canvas, gameState) {
     ev.preventDefault();
     const layout = computeLayout(window.innerWidth, window.innerHeight);
     const p = pointFromEvent(ev);
+    const tapPad = layout.unitSizePx * 0.25;
 
-    // Modal open: try buttons first, otherwise close.
+    // Modal open: floor button (queue + stay open) or anywhere else (close).
     if (gameState.modal === 'KEYPAD') {
       const modalArea = computeKeypadModalArea(layout);
       const buttons = computeKeypadButtons(modalArea);
-      const hit = buttons.find(b => insideRect(p, expandRect(b.rect, layout.unitSizePx * 0.15)));
+      const hit = buttons.find(b => insideRect(p, expandRect(b.rect, tapPad)));
       if (hit) {
         processCall(gameState.elevator, hit.floorIndex);
-        // Keep the modal open for multi-press (per the proposal).
         return;
       }
       gameState.modal = null;
       return;
     }
 
-    // No modal: tap the bottom-right panel face to open it.
+    // Action buttons (bottom-left)
+    const action = computeActionButtonRects(layout);
+    if (insideRect(p, expandRect(action.openClose, tapPad))) {
+      toggleDoor(gameState.elevator);
+      return;
+    }
+    if (insideRect(p, expandRect(action.inOut, tapPad))) {
+      toggleInOut(gameState.player, gameState.elevator);
+      return;
+    }
+
+    // Bottom-right panel face → open keypad modal
     if (insideRect(p, layout.bottomRight)) {
       gameState.modal = 'KEYPAD';
+      return;
+    }
+
+    // Tower-view tap on the player's current floor → walk to that x.
+    if (insideRect(p, layout.tower) && gameState.player.state !== 'IN_ELEVATOR') {
+      const cameraY = gameState.elevator.position + 0.5;
+      const towerY = screenYToTowerY(p.y, layout, cameraY);
+      const tappedFloor = Math.floor(towerY);
+      if (tappedFloor === gameState.player.floor) {
+        const towerX = screenXToTowerX(p.x, layout);
+        setWalkTarget(gameState.player, towerX);
+      }
       return;
     }
   }
@@ -46,9 +73,6 @@ function insideRect(p, r) {
   return p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
 }
 
-// Expand a rect outward by `padding` on all sides — used to give buttons
-// a slightly larger tap target than their visual bounds (per the proposal's
-// hit-region principle).
 function expandRect(r, padding) {
   return { x: r.x - padding, y: r.y - padding, w: r.w + padding * 2, h: r.h + padding * 2 };
 }

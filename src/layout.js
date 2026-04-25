@@ -35,3 +35,14 @@ export function towerYToScreenY(towerY, layout, cameraY) {
 export function towerXToScreenX(towerX, layout) {
   return layout.tower.x + towerX * layout.unitSizePx;
 }
+
+// Inverse of towerYToScreenY — pixel y → tower y (units).
+export function screenYToTowerY(screenY, layout, cameraY) {
+  const centerScreenY = layout.tower.y + layout.tower.h / 2;
+  return cameraY - (screenY - centerScreenY) / layout.unitSizePx;
+}
+
+// Inverse of towerXToScreenX — pixel x → tower x (units).
+export function screenXToTowerX(screenX, layout) {
+  return (screenX - layout.tower.x) / layout.unitSizePx;
+}

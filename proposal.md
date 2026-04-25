@@ -227,7 +227,7 @@ Hit-test dispatcher mapping screen taps to events:
 
 Single canvas, split into regions each frame. **All renderers work in unit coordinates**; a single `unit_size_px` (computed from canvas width / 10) is multiplied in at draw time. State carries no pixel values.
 
-- `TowerRenderer` — floors, shaft, elevator car position, player, sky/dirt backgrounds, exterior walls, with camera offset.
+- `TowerRenderer` — floors, shaft, elevator car position, sky/dirt backgrounds, exterior walls, with camera offset. Renders the player sprite **only when visible** per §5.6 (full size on a floor, small inside the shaft tile if doors are open, hidden otherwise).
 - `ElevatorGraphicRenderer` — close-up of the car doors (lower-left), purely visual based on door state.
 - `ActionButtonRenderer` — the 1u Open/Close and 1u In/Out buttons.
 - `PanelPictureRenderer` — schematic / sprite of the panel (lower-right).
@@ -247,17 +247,23 @@ Player {
 
 **Sprite**: a stylized figure in the style of a public-bathroom sign — geometric, head + torso + limbs, no faces or detail. Single static silhouette; no walk cycle. Movement is pure position interpolation — the figure **slides** through space.
 
-**Two scales:**
-- On a floor: full size (~1u tall is a reasonable starting point, tune with art).
-- In the elevator: scaled smaller to fit inside the 1u shaft tile.
+**Visibility & scale (rendered in the tower view):**
 
-The In/Out button toggles between these scales. There is no walking animation into or out of the car — the scale change *is* the animation. The figure stays at the same on-screen position; only its size changes. (Optional polish: tween the scale over a few hundred ms instead of snapping.)
+| State | Doors | Render |
+|---|---|---|
+| On floor (`SLIDING` / `IDLE`) | open or closed | full size, on the floor in the corridor |
+| `IN_ELEVATOR` | **open** | smaller, framed inside the 1u shaft tile (visible through the open doors) |
+| `IN_ELEVATOR` | **closed** | **not rendered** — the closed doors hide the interior |
+
+So when the elevator is traveling (doors closed by definition), the player simply isn't drawn. You see the elevator car shell move through the shaft. When it arrives and the doors open, the figure pops back into view inside the tile. This is also the only time scale changes: it's not really "the In/Out button shrinks the sprite," it's that **inside the elevator with doors open** is the only context where the sprite is drawn small.
+
+There is no walking animation into or out of the car. The figure stays at the same on-screen horizontal position; entering/exiting is just a state flip plus a render-rule change.
 
 Movement summary:
 - On a floor: tap floor → player slides horizontally to the tap point.
-- Tap In/Out button (car at this floor + doors open + player on this floor) → `IN_ELEVATOR`, sprite shrinks.
-- While IN_ELEVATOR: figure rides with the car in the tower view (small, inside the shaft tile).
-- Tap In/Out button (doors open + player IN_ELEVATOR) → exit, sprite grows back to full size on the current floor.
+- Tap In/Out (car at this floor + doors open + player on this floor) → `IN_ELEVATOR`. Sprite is now drawn smaller inside the shaft tile.
+- Doors close, car travels, doors open: during travel the sprite is hidden; on arrival it reappears inside the new floor's shaft tile.
+- Tap In/Out (doors open + player IN_ELEVATOR) → exit, sprite returns to full size on the current floor.
 
 No auto-exit; the player explicitly toggles state.
 

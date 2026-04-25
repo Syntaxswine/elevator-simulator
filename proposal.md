@@ -48,15 +48,17 @@ A tower-setup screen is dropped for now. The 12-floor layout is fixed, so there'
 
 ## 4. Gameplay Screen Layout
 
-**Vertical split: top 2/3 = tower view, bottom 1/3 = elevator graphic + control panel + their action buttons.**
+**Vertical split: 1u floor-indicator strip at top, tower view in the middle, bottom 1/3 of total height for the two graphics + action buttons.**
 
 ```
 ┌────────────────────────────────────────────────────┐
+│              ▲   L         (floor indicator)       │ ← 1u HUD strip
+├────────────────────────────────────────────────────┤
 │ ░│                                              │░ │ ╲
-│ ░│        TOP: TOWER VIEW (2/3)                 │░ │  │
+│ ░│        TOWER VIEW                            │░ │  │
 │ ░│  (player as bathroom-sign sprite)            │░ │  │ tower
 │ ▓│                                              │▓ │  │ viewport
-│ ▓│  (dirt below ground line)                    │▓ │  │
+│ ▓│  (dirt below ground line)                    │▓ │  │ (≈ 2/3 - 1u)
 │ ▓│                                              │▓ │ ╱
 ├──────────────────────────┬─────────────────────────┤
 │                          │                         │ ╲
@@ -68,6 +70,8 @@ A tower-setup screen is dropped for now. The 12-floor layout is fixed, so there'
 │   1u×1u  1u×1u           │                         │ ╱
 └──────────────────────────┴─────────────────────────┘
 ```
+
+**Floor indicator (HUD, top 1u strip):** a thin full-width strip showing the elevator's current floor label (`SB`, `B`, `L`, `2`–`10`) and a direction arrow (`▲` / `▼` / none). The number **ticks as the car crosses floor thresholds** during travel, so the player has live feedback while the doors are closed and they can't see anything else. Visible at all times during gameplay.
 
 `[O/C]` = open/close door button. `[IN/OUT]` = get in/out toggle. Both are **1 unit × 1 unit** (where "unit" is the same 1×1 square as the elevator shaft tile — see Unit system below).
 
@@ -111,7 +115,7 @@ The shaft tile is the **scale anchor**. Because it's square, it fixes the unit's
 
 1. **No fixed pixel layout.** The renderer reads canvas width, computes `unit_size_px`, and draws in unit coordinates. Resize the window or rotate the device → world re-scales smoothly. No breakpoints needed.
 2. **Visible-floor count is *derived*, not configured.** `floors_visible_at_once ≈ tower_viewport_height_px / unit_size_px`. On a tall phone, more of the tower fits; on a wider/shorter window, less. The camera handles which floors are in frame (next subsection).
-3. **Bottom region is exactly 1/3 of screen height** (not a fixed unit count). Its height in units therefore *varies with aspect ratio*: ~5–7 units tall on a portrait phone, ~2 units tall on a landscape window. The 1u×1u action buttons fit anywhere from ~2u tall and up; on very wide/short screens the bottom region gets cramped (flagged in §7 portrait/landscape question). Tower viewport is the remaining 2/3, and #2 applies.
+3. **Bottom region is exactly 1/3 of screen height** (not a fixed unit count). Its height in units therefore *varies with aspect ratio*: ~5–7 units tall on a portrait phone, ~2 units tall on a landscape window. The 1u×1u action buttons fit anywhere from ~2u tall and up; on very wide/short screens the bottom region gets cramped (flagged in §7 portrait/landscape question). The **top 1u** is the floor-indicator HUD. The tower viewport gets the remainder: `screen_height - 1u - (1/3 × screen_height)` ≈ `(2/3 × screen_height) - 1u`. Visible-floor count derives from that.
 4. **Sprites must be authored at unit-multiples.** Pick a base sprite resolution (e.g. 64 px = 1 unit) and every asset is a clean multiple. The shaft tile is the canonical 1-unit reference; everything else is sized against it.
 
 This is why the 10-unit width matters: it makes the unit-from-screen-width division clean, and the square shaft tile makes the unit consistent across both axes for free.
@@ -231,6 +235,7 @@ Hit-test dispatcher mapping screen taps to events:
 
 Single canvas, split into regions each frame. **All renderers work in unit coordinates**; a single `unit_size_px` (computed from canvas width / 10) is multiplied in at draw time. State carries no pixel values.
 
+- `FloorIndicatorRenderer` — top 1u HUD strip; reads `elevator.currentFloor` (or the floor it's currently crossing during travel) and `elevator.direction`. Updates discretely as the car crosses thresholds.
 - `TowerRenderer` — floors, shaft, elevator car position, sky/dirt backgrounds, exterior walls, with camera offset. Renders the player sprite **only when visible** per §5.6 (full size on a floor, small inside the shaft tile if doors are open, hidden otherwise).
 - `ElevatorGraphicRenderer` — close-up of the car doors (lower-left), purely visual based on door state.
 - `ActionButtonRenderer` — the 1u Open/Close and 1u In/Out buttons.
@@ -316,10 +321,10 @@ Single top-level state tree, updated per tick. Easy to serialize later.
 Canvas, scene manager, game loop, title → gameplay transition, region splitting.
 
 **M1 — Static Tower + Elevator Rendering** (week 1)
-12 floors with sky/dirt backgrounds, shaft, elevator car at a fixed floor, elevator doors graphic + control panel graphic + 1u Open/Close + 1u In/Out buttons drawn (non-functional), keypad modal layout (non-functional). Verify the bottom-1/3 split renders correctly across portrait phone aspect ratios.
+12 floors with sky/dirt backgrounds, shaft, elevator car at a fixed floor, elevator doors graphic + control panel graphic + 1u Open/Close + 1u In/Out buttons drawn (non-functional), keypad modal layout (non-functional), floor-indicator HUD strip rendered with the static current floor. Verify the layout (1u top + 2/3-1u tower + 1/3 bottom) renders correctly across portrait phone aspect ratios.
 
 **M2 — Realistic Elevator + Modal Wired Up** (week 2)
-Tap panel graphic → keypad opens → tap one or more floor buttons → car queues them and services in travel order (collective-selective for in-car requests). Lit-button visual state for queued floors. Open/Close button toggles doors. Emergency stop works. **No player yet** — proves the elevator mechanics.
+Tap panel graphic → keypad opens → tap one or more floor buttons → car queues them and services in travel order (collective-selective for in-car requests). Lit-button visual state for queued floors. Open/Close button toggles doors. Emergency stop works. **Floor-indicator HUD ticks live** as the car crosses thresholds, plus shows direction arrow. **No player yet** — proves the elevator mechanics.
 
 **M3 — Player + Enter/Exit + Floor Walking** (week 3)
 Bathroom-sign player sprite, slide-to-tap on current floor, In/Out toggle button (sprite scales between full size on floor and shrunk in elevator), player rides with the car in the tower view. Camera follows the elevator vertically. Core loop complete.

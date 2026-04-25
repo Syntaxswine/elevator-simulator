@@ -48,24 +48,28 @@ A tower-setup screen is dropped for now. The 12-floor layout is fixed, so there'
 
 ## 4. Gameplay Screen Layout
 
+**Vertical split: top 2/3 = tower view, bottom 1/3 = elevator graphic + control panel + their action buttons.**
+
 ```
 ┌────────────────────────────────────────────────────┐
-│ ░│                                              │░ │
-│ ░│        TOP: TOWER VIEW                       │░ │  ← sky above ground
-│ ░│  (10 floors visible: L through 10)           │░ │
-│ ▓│                                              │▓ │
-│ ▓│  (2 floors below ground: B, SB)              │▓ │  ← dirt below ground
-│ ▓│                                              │▓ │
+│ ░│                                              │░ │ ╲
+│ ░│        TOP: TOWER VIEW (2/3)                 │░ │  │
+│ ░│  (player as bathroom-sign sprite)            │░ │  │ tower
+│ ▓│                                              │▓ │  │ viewport
+│ ▓│  (dirt below ground line)                    │▓ │  │
+│ ▓│                                              │▓ │ ╱
 ├──────────────────────────┬─────────────────────────┤
-│                          │                         │
-│   BOTTOM-LEFT:           │   BOTTOM-RIGHT:         │
-│   ELEVATOR PICTURE       │   PANEL PICTURE         │
-│   (tap = toggle doors)   │   (tap = open keypad    │
-│   ┌────┐ ┌────┐          │    modal)               │
-│   │ENTR│ │EXIT│          │                         │
-│   └────┘ └────┘          │                         │
+│                          │                         │ ╲
+│   ELEVATOR DOORS         │   CONTROL PANEL         │  │
+│   (graphic, visual       │   (graphic; tap to      │  │ bottom
+│    door state)           │    open keypad modal)   │  │ 1/3
+│                          │                         │  │
+│   [O/C]  [IN/OUT]        │                         │  │
+│   1u×1u  1u×1u           │                         │ ╱
 └──────────────────────────┴─────────────────────────┘
 ```
+
+`[O/C]` = open/close door button. `[IN/OUT]` = get in/out toggle. Both are **1 unit × 1 unit** (where "unit" is the same 1×1 square as the elevator shaft tile — see Unit system below).
 
 ### Tower geometry (fixed)
 
@@ -86,13 +90,15 @@ The earlier "widen at the base" idea is dropped — uniform floors are simpler a
 
 ### Unit system (load-bearing)
 
-All in-game dimensions are expressed in **units**, never pixels. One unit is derived at runtime:
+All in-game dimensions are expressed in **units**. **A unit is one 1×1 square — the same dimensions as the elevator shaft tile.** This is the canonical term used throughout the rest of this document and in code.
+
+One unit is derived in pixels at runtime:
 
 ```
 unit_size_px = screen_width_px / 10
 ```
 
-The **1×1 elevator shaft tile is the scale anchor**. Because it's square, it fixes the unit's horizontal *and* vertical size simultaneously — there is no separate vertical unit. Every other tile is a multiple:
+The shaft tile is the **scale anchor**. Because it's square, it fixes the unit's horizontal *and* vertical size simultaneously — there is no separate vertical unit. Every other tile is a multiple:
 
 | Tile | Width × Height (units) |
 |---|---|
@@ -105,7 +111,7 @@ The **1×1 elevator shaft tile is the scale anchor**. Because it's square, it fi
 
 1. **No fixed pixel layout.** The renderer reads canvas width, computes `unit_size_px`, and draws in unit coordinates. Resize the window or rotate the device → world re-scales smoothly. No breakpoints needed.
 2. **Visible-floor count is *derived*, not configured.** `floors_visible_at_once ≈ tower_viewport_height_px / unit_size_px`. On a tall phone, more of the tower fits; on a wider/shorter window, less. The camera handles which floors are in frame (next subsection).
-3. **Bottom region (elevator picture + panel picture) is unit-sized too.** Probably ~4 units tall, exact value tuned with the art. That fixes a known number of pixels off the bottom; whatever remains is the tower viewport, and #2 applies.
+3. **Bottom region is exactly 1/3 of screen height** (not a fixed unit count). Its height in units therefore *varies with aspect ratio*: ~5–7 units tall on a portrait phone, ~2 units tall on a landscape window. The 1u×1u action buttons fit anywhere from ~2u tall and up; on very wide/short screens the bottom region gets cramped (flagged in §7 portrait/landscape question). Tower viewport is the remaining 2/3, and #2 applies.
 4. **Sprites must be authored at unit-multiples.** Pick a base sprite resolution (e.g. 64 px = 1 unit) and every asset is a clean multiple. The shaft tile is the canonical 1-unit reference; everything else is sized against it.
 
 This is why the 10-unit width matters: it makes the unit-from-screen-width division clean, and the square shaft tile makes the unit consistent across both axes for free.
@@ -114,7 +120,7 @@ This is why the 10-unit width matters: it makes the unit-from-screen-width divis
 
 - **Vertical:** the tower viewport is always centered vertically on the **elevator car**. When the elevator moves, the tower scrolls past it. How many floors are visible above and below the car is whatever fits at the current `unit_size_px` (see Unit system).
 - **Horizontal:** no scroll, ever. The full 10-unit tower width *is* the screen width by construction.
-- **Player rendering:** the player is fixed at the **horizontal middle** of their floor segment and walks left/right within the on-screen 4-wide corridor; the world doesn't scroll horizontally, the player just translates within the viewport.
+- **Player rendering:** the player figure (bathroom-sign style — see §5.6) slides left/right within the on-screen 4-unit corridor; the world doesn't scroll horizontally, the figure just translates within the viewport.
 - **Player + elevator co-location (M2 default):** while there's only one call active at a time and no NPCs, the elevator stays parked at the player's floor when they walk off, so the player is always at vertical center too. They diverge only in M4 when external calls drag the elevator away.
 - **M4 edge case:** when NPC calls move the elevator off the player's floor, the player's floor scrolls off-center. They remain on that floor and need to call the car back. UX implication flagged in §7.
 
@@ -137,7 +143,7 @@ When the player taps the panel picture (lower-right), a modal overlay covers the
 
 Buttons sized for thumb taps. Tapping a floor button **adds it to the in-car queue** and lights up; the car services queued floors in travel order. ▲/▼ register a hall call (M4). STOP triggers emergency stop. Whether tapping a floor button auto-dismisses the modal or keeps it open for multi-press is open (§7 #2); the more elevator-like behavior is to keep it open until the player explicitly closes it.
 
-Door open/close is **not** in the modal — that's handled by tapping the elevator picture directly.
+Door open/close is **not** in the modal — that's the dedicated 1u Open/Close button next to the elevator graphic.
 
 ## 5. Core Systems
 
@@ -204,12 +210,12 @@ Hit-test dispatcher mapping screen taps to events:
 
 | Region | Tap action |
 |---|---|
-| Tower view, player's current floor | walk target — player glides horizontally |
+| Tower view, player's current floor | walk target — player slides horizontally |
 | Tower view, other floors (M4) | optional: register a hall call |
-| Elevator picture (lower-left) | toggle doors (open if closed, close if open) — only valid while car is `IDLE` |
-| ENTR sub-button (under elevator pic) | walk emoji into car, if car is at player's floor with doors open |
-| EXIT sub-button (under elevator pic) | walk emoji out of car, if doors are open |
-| Panel picture (lower-right) | open modal keypad |
+| Elevator doors graphic (lower-left) | none — purely visual, shows door state |
+| **Open/Close button** (1u×1u, near elevator graphic) | toggle doors (open if closed, close if open) — only valid while car is `IDLE` |
+| **In/Out button** (1u×1u, near elevator graphic) | toggle player `IN_ELEVATOR` state when car is at their floor with doors open. No walking animation; player sprite scales (smaller in elevator, full size on floor) |
+| Panel graphic (lower-right) | open modal keypad |
 | Modal: floor button | add floor to in-car queue, light button (modal stay-or-dismiss per §7 #2) |
 | Modal: ▲ / ▼ | register hall call from player's current floor (M4) |
 | Modal: STOP | emergency stop, dismiss modal |
@@ -222,7 +228,8 @@ Hit-test dispatcher mapping screen taps to events:
 Single canvas, split into regions each frame. **All renderers work in unit coordinates**; a single `unit_size_px` (computed from canvas width / 10) is multiplied in at draw time. State carries no pixel values.
 
 - `TowerRenderer` — floors, shaft, elevator car position, player, sky/dirt backgrounds, exterior walls, with camera offset.
-- `ElevatorPictureRenderer` — close-up of the car (lower-left) showing emoji when inside; renders ENTR/EXIT sub-buttons.
+- `ElevatorGraphicRenderer` — close-up of the car doors (lower-left), purely visual based on door state.
+- `ActionButtonRenderer` — the 1u Open/Close and 1u In/Out buttons.
 - `PanelPictureRenderer` — schematic / sprite of the panel (lower-right).
 - `KeypadModalRenderer` — drawn on top when modal is active; dims the rest of the screen.
 
@@ -232,26 +239,36 @@ Keep each renderer pure (state in, pixels out). Easy to swap pixel art when asse
 ```
 Player {
   floor: int                  // index 0..11
-  xOffset: float              // horizontal position within that floor's corridor
-  state: WALKING | IDLE | IN_ELEVATOR
-  emoji: string               // 🙂 default; configurable
+  xOffset: float              // horizontal position within that floor (in units)
+  state: SLIDING | IDLE | IN_ELEVATOR
+  sprite: BathroomSignFigure  // see below
 }
 ```
 
-Movement summary:
-- On a floor: tap floor → player walks to the tap point.
-- Tap ENTR sub-button (when car at this floor + doors open) → player walks into car, `state = IN_ELEVATOR`.
-- While IN_ELEVATOR: emoji rides with the car in the tower view AND shows in the elevator picture.
-- Tap EXIT sub-button (when doors open) → player walks out onto the current floor, `state = WALKING/IDLE`.
+**Sprite**: a stylized figure in the style of a public-bathroom sign — geometric, head + torso + limbs, no faces or detail. Single static silhouette; no walk cycle. Movement is pure position interpolation — the figure **slides** through space.
 
-No auto-exit; the player explicitly chooses when to leave the car.
+**Two scales:**
+- On a floor: full size (~1u tall is a reasonable starting point, tune with art).
+- In the elevator: scaled smaller to fit inside the 1u shaft tile.
+
+The In/Out button toggles between these scales. There is no walking animation into or out of the car — the scale change *is* the animation. The figure stays at the same on-screen position; only its size changes. (Optional polish: tween the scale over a few hundred ms instead of snapping.)
+
+Movement summary:
+- On a floor: tap floor → player slides horizontally to the tap point.
+- Tap In/Out button (car at this floor + doors open + player on this floor) → `IN_ELEVATOR`, sprite shrinks.
+- While IN_ELEVATOR: figure rides with the car in the tower view (small, inside the shaft tile).
+- Tap In/Out button (doors open + player IN_ELEVATOR) → exit, sprite grows back to full size on the current floor.
+
+No auto-exit; the player explicitly toggles state.
 
 ### 5.7 Assets
 Visuals come later. The architecture assumes a sprite/tile pipeline where:
 - All sprites are authored at **unit-multiple resolutions** (e.g. base 64 px = 1 unit; the 1×1 shaft tile is 64×64, a 4×1 corridor is 256×64, a 0.5×1 wall is 32×64). Pick the base once, every asset follows.
 - Floors compose from tile sprites; sky and dirt are tiled backgrounds.
 - Elevator car has a sprite per door state (closed / opening / open / closing).
-- Panel picture and keypad button sprites with lit/unlit variants.
+- The lower-left **elevator doors graphic** is a separate, larger close-up showing door state for visual feedback (its size in units is whatever fits in the bottom-left half of the bottom 1/3).
+- Panel graphic and keypad button sprites with lit/unlit variants.
+- **Player sprite**: a single bathroom-sign-style pictogram. Static silhouette; no animation frames. Just two render scales (on-floor full size, in-elevator shrunk to fit the shaft tile). One asset, one figure, all motion via position/scale interpolation.
 - An asset manifest (`assets.json`) maps logical names → files. Placeholder solid rectangles until real art lands.
 
 ## 6. Data Model Summary
@@ -280,7 +297,8 @@ Single top-level state tree, updated per tick. Easy to serialize later.
 5. **Multiple elevators.** Single car for now. A bank-of-N is a significant dispatcher upgrade — defer.
 6. **Audio.** '90s elevator games live or die on the chimes. Worth scoping in early.
 7. **Save/load.** Less relevant with the fixed tower; revisit when/if floor contents become persistent.
-8. **Portrait vs landscape on phones.** The three-region layout assumes landscape-ish proportions. Worth deciding: lock orientation, or design a portrait variant.
+8. **Portrait vs landscape.** The bottom-1/3 layout works *better* the taller the screen is — portrait phones get 5–7 units of bottom region, landscape windows get ~2 units which gets tight for the elevator graphic + 1u buttons. Lock to portrait? Or design a fallback for short-and-wide?
+9. **1u touch-target size on small phones.** A 1u button on a 360-px-wide screen is 36 px square — below Apple's 44pt and Google's 48dp guidelines. Either accept it (the modal keypad has the truly thumb-sized buttons), enlarge the on-screen action buttons to e.g. 1.5u, or auto-enlarge below a width threshold.
 
 ## 8. Proposed Milestones
 
@@ -288,13 +306,13 @@ Single top-level state tree, updated per tick. Easy to serialize later.
 Canvas, scene manager, game loop, title → gameplay transition, region splitting.
 
 **M1 — Static Tower + Elevator Rendering** (week 1)
-12 floors with sky/dirt backgrounds, shaft, elevator car at a fixed floor, panel + elevator pictures drawn (non-functional), keypad modal layout (non-functional).
+12 floors with sky/dirt backgrounds, shaft, elevator car at a fixed floor, elevator doors graphic + control panel graphic + 1u Open/Close + 1u In/Out buttons drawn (non-functional), keypad modal layout (non-functional). Verify the bottom-1/3 split renders correctly across portrait phone aspect ratios.
 
 **M2 — Realistic Elevator + Modal Wired Up** (week 2)
-Tap panel → keypad opens → tap one or more floor buttons → car queues them and services in travel order (collective-selective for in-car requests). Lit-button visual state for queued floors. Door toggle on elevator picture works. Emergency stop works. **No player yet** — proves the elevator mechanics.
+Tap panel graphic → keypad opens → tap one or more floor buttons → car queues them and services in travel order (collective-selective for in-car requests). Lit-button visual state for queued floors. Open/Close button toggles doors. Emergency stop works. **No player yet** — proves the elevator mechanics.
 
 **M3 — Player + Enter/Exit + Floor Walking** (week 3)
-Emoji player horizontally centered, walk-to-tap on current floor, ENTR/EXIT sub-buttons, player rides in car view. Camera follows the elevator vertically. Core loop complete.
+Bathroom-sign player sprite, slide-to-tap on current floor, In/Out toggle button (sprite scales between full size on floor and shrunk in elevator), player rides with the car in the tower view. Camera follows the elevator vertically. Core loop complete.
 
 **M4 — Hall Calls + NPC Traffic**
 Add ▲/▼ hall-call mechanic from the player's current floor; introduce NPCs that generate external calls. The collective-selective dispatcher (already in place from M2) gets its full workout. Decide on player-visibility behavior when the car is dragged away (see §7 #3).

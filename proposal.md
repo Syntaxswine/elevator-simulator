@@ -172,7 +172,7 @@ Floor {
 
 A small lookup maps `label ↔ index` (e.g. `"L" ↔ 2`). The label is the user-facing identifier; the index is what the elevator state machine uses.
 
-`tileVariant` lets each floor pick from a pool of corridor sprites. Initial pool: `office-1` (green-wall office), `office-2` (brick-wall industrial). Lobby and basements will get their own variants when assets land. Both corridors of a floor (left and right of the shaft) use the same variant for that floor — visual coherence per floor, variety between floors.
+`tileVariant` lets each floor pick from a pool of corridor sprites. Initial pool: `office-1` (green-wall office), `office-2` (brick-wall industrial loft), `office-3` (high-rise office with city skyline). Lobby and basements will get their own variants when assets land. Both corridors of a floor (left and right of the shaft) use the same variant for that floor — visual coherence per floor, variety between floors.
 
 ### 5.3 Elevator Simulation — the most important subsystem
 
@@ -290,7 +290,7 @@ Placeholder assets land in `assets/`. The pipeline:
 - **Player sprite**: a single bathroom-sign-style pictogram. Static silhouette; no animation frames. Two render scales (on-floor full size, in-elevator shrunk inside the shaft tile). One asset, all motion via position/scale interpolation.
 - An asset manifest (`assets.json`) maps logical names → files (e.g. `"sky" → "assets/sky.png"`, `"office-1" → "assets/office-1.png"`).
 
-**Currently delivered placeholders** (in `assets/`): `sky.png`, `dirt.png`, `elevator-bank.png`, `office-1.png`, `office-2.png`. Still TBD: lobby corridor variant, basement/sub-basement variants, control panel graphic, action-button graphics, floor-indicator HUD graphic, player sprite, modal keypad button sprites.
+**Currently delivered placeholders** (in `assets/`): `sky.png`, `dirt.png`, `elevator-bank.png`, `office-1.png`, `office-2.png`, `office-3.png`. Still TBD: lobby corridor variant, basement/sub-basement variants, control panel graphic, action-button graphics, floor-indicator HUD graphic, player sprite, modal keypad button sprites.
 
 ## 6. Data Model Summary
 

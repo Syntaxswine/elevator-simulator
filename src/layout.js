@@ -1,7 +1,7 @@
 import {
   TOWER_WIDTH_UNITS,
   INDICATOR_HEIGHT_UNITS,
-  BOTTOM_REGION_RATIO,
+  BOTTOM_REGION_HEIGHT_UNITS,
 } from './config.js';
 
 // Compute pixel rectangles for each region, given canvas pixel dimensions.
@@ -9,7 +9,8 @@ import {
 export function computeLayout(canvasWidth, canvasHeight) {
   const unitSizePx = canvasWidth / TOWER_WIDTH_UNITS;
   const indicatorH = INDICATOR_HEIGHT_UNITS * unitSizePx;
-  const bottomH = canvasHeight * BOTTOM_REGION_RATIO;
+  // Bottom region is exactly two 5×5u tiles (5u tall, full width).
+  const bottomH = BOTTOM_REGION_HEIGHT_UNITS * unitSizePx;
   const towerH = canvasHeight - indicatorH - bottomH;
 
   return {

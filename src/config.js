@@ -22,7 +22,7 @@ export const GROUND_LINE_Y = LOBBY_INDEX;  // bottom of L = top of B
 
 // Layout
 export const INDICATOR_HEIGHT_UNITS = 1;
-export const BOTTOM_REGION_RATIO = 1 / 3;
+export const BOTTOM_REGION_HEIGHT_UNITS = 5;   // 5u tall: two 5×5 tiles side-by-side
 
 // Tile-variant pools
 export const OFFICE_VARIANTS = ['office-1', 'office-2', 'office-3'];

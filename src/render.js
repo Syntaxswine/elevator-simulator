@@ -351,14 +351,14 @@ function drawPlayer(ctx, layout, cameraY, player, elevator, assets) {
 // ---------- Bottom: elevator close-up + control panel ----------
 
 // Returns the rects of the two 1u action buttons (Open/Close, In/Out)
-// in the bottom-left region. Used by both render and input.
+// overlapping the bottom of the elevator close-up tile. Used by both
+// render and input.
 export function computeActionButtonRects(layout) {
   const { bottomLeft, unitSizePx } = layout;
-  const buttonStripH = unitSizePx;
-  const closeupAreaH = Math.max(0, bottomLeft.h - buttonStripH);
-  const buttonY = bottomLeft.y + closeupAreaH + (buttonStripH - unitSizePx) / 2;
-  const ocX = bottomLeft.x + bottomLeft.w / 2 - unitSizePx - unitSizePx * 0.25;
-  const ioX = bottomLeft.x + bottomLeft.w / 2 + unitSizePx * 0.25;
+  const inset = unitSizePx * 0.25;        // 0.25u from the tile's bottom edge
+  const buttonY = bottomLeft.y + bottomLeft.h - unitSizePx - inset;
+  const ocX = bottomLeft.x + bottomLeft.w / 2 - unitSizePx - unitSizePx * 0.2;
+  const ioX = bottomLeft.x + bottomLeft.w / 2 + unitSizePx * 0.2;
   return {
     openClose: { x: ocX, y: buttonY, w: unitSizePx, h: unitSizePx },
     inOut:     { x: ioX, y: buttonY, w: unitSizePx, h: unitSizePx },
@@ -366,31 +366,33 @@ export function computeActionButtonRects(layout) {
 }
 
 function renderBottomRegion(ctx, layout, gameState) {
-  const { bottomLeft, bottomRight, unitSizePx } = layout;
-  const { assets } = gameState;
+  const { bottomLeft, bottomRight } = layout;
+  const { assets, elevator } = gameState;
 
   ctx.fillStyle = '#0e0e12';
   ctx.fillRect(layout.bottom.x, layout.bottom.y, layout.bottom.w, layout.bottom.h);
 
-  // Bottom-left: elevator-bank close-up + 1u action buttons
-  const buttonStripH = unitSizePx;
-  const closeupArea = {
-    x: bottomLeft.x,
-    y: bottomLeft.y,
-    w: bottomLeft.w,
-    h: Math.max(0, bottomLeft.h - buttonStripH),
-  };
+  // Bottom-left: elevator close-up tile (5u × 5u square).
+  // Crossfades between the closed bank and the open interior with doorProgress.
   if (assets['elevator-bank']) {
-    drawImageContain(ctx, assets['elevator-bank'], closeupArea);
+    drawImageContain(ctx, assets['elevator-bank'], bottomLeft);
   } else {
     ctx.fillStyle = '#222';
-    ctx.fillRect(closeupArea.x, closeupArea.y, closeupArea.w, closeupArea.h);
+    ctx.fillRect(bottomLeft.x, bottomLeft.y, bottomLeft.w, bottomLeft.h);
   }
+  if (assets['elevator-current-floor'] && elevator.doorProgress > 0) {
+    ctx.save();
+    ctx.globalAlpha = elevator.doorProgress;
+    drawImageContain(ctx, assets['elevator-current-floor'], bottomLeft);
+    ctx.restore();
+  }
+
+  // 1u action buttons overlaid near the bottom of the elevator close-up.
   const buttons = computeActionButtonRects(layout);
   drawActionButton(ctx, buttons.openClose, 'O/C');
   drawActionButton(ctx, buttons.inOut, 'IN/OUT');
 
-  // Bottom-right: control-panel face (elevator-button.png contained)
+  // Bottom-right: control-panel face (elevator-button.png contained, 5u × 5u).
   ctx.fillStyle = '#0e0e12';
   ctx.fillRect(bottomRight.x, bottomRight.y, bottomRight.w, bottomRight.h);
   if (assets['elevator-button']) {

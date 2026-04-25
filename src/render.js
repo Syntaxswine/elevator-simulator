@@ -385,6 +385,8 @@ function renderBottomRegion(ctx, layout, gameState) {
     ctx.globalAlpha = elevator.doorProgress;
     drawImageContain(ctx, assets['elevator-current-floor'], bottomLeft);
     ctx.restore();
+    // Anyone inside the elevator becomes visible against the open interior.
+    drawCloseUpRiders(ctx, layout, gameState);
   }
 
   // 1u action buttons overlaid near the bottom of the elevator close-up.
@@ -398,6 +400,47 @@ function renderBottomRegion(ctx, layout, gameState) {
   if (assets['elevator-button']) {
     drawImageContain(ctx, assets['elevator-button'], bottomRight);
   }
+}
+
+// Renders the player + NPCs that are IN_ELEVATOR onto the bottom-left
+// close-up image. They stand on the carpet, spread horizontally inside
+// the visible interior of the open elevator art.
+function drawCloseUpRiders(ctx, layout, gameState) {
+  const { bottomLeft } = layout;
+  const { player, npcs, assets, elevator } = gameState;
+  const sprite = assets.player;
+  if (!sprite) return;
+
+  // Collect everyone inside the car
+  const riders = [];
+  if (player.state === 'IN_ELEVATOR') riders.push({ tint: null });
+  for (const npc of (npcs ?? [])) {
+    if (npc.state === 'IN_ELEVATOR') riders.push({ tint: npc.color });
+  }
+  if (riders.length === 0) return;
+
+  // Carpet is roughly the lower 8% of the close-up image.
+  const carpetY = bottomLeft.y + bottomLeft.h * 0.92;
+  const figureH = bottomLeft.h * 0.42;
+  const aspect = sprite.width / sprite.height;
+  const figureW = figureH * aspect;
+
+  // Spread within the central 55% of the tile width.
+  const spreadW = bottomLeft.w * 0.55;
+  const cx0 = bottomLeft.x + (bottomLeft.w - spreadW) / 2 + figureW / 2;
+  const stepX = riders.length > 1 ? spreadW / (riders.length - 1) : 0;
+
+  ctx.save();
+  // Fade with doorProgress so figures don't pop in/out as doors animate.
+  ctx.globalAlpha = elevator.doorProgress;
+  for (let i = 0; i < riders.length; i++) {
+    const cx = cx0 + (riders.length === 1 ? spreadW / 2 - figureW / 2 : i * stepX);
+    const dx = cx - figureW / 2;
+    const dy = carpetY - figureH;
+    const img = riders[i].tint ? getTintedSprite(sprite, riders[i].tint) : sprite;
+    ctx.drawImage(img, dx, dy, figureW, figureH);
+  }
+  ctx.restore();
 }
 
 function drawImageContain(ctx, img, area) {

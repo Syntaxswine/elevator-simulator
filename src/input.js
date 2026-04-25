@@ -7,7 +7,13 @@ import {
 } from './render.js';
 import { processCall, toggleDoor, toggleEmergencyStop } from './elevator.js';
 import { setWalkTarget, toggleInOut } from './player.js';
-import { SHAFT_LEFT_X, SHAFT_RIGHT_X } from './config.js';
+import {
+  SHAFT_LEFT_X,
+  SHAFT_RIGHT_X,
+  WALL_WIDTH_UNITS,
+  TOWER_WIDTH_UNITS,
+  LOBBY_INDEX,
+} from './config.js';
 
 // Pointer hit-tester. Hit regions can be larger than visual regions per the
 // proposal; small 1u buttons get a thumb-friendly tap-pad expansion.
@@ -66,16 +72,27 @@ export function attachInput(canvas, gameState) {
       return;
     }
 
-    // Tower-view tap on the player's current floor:
-    //  - tap the elevator door (shaft column) → call the elevator AND walk to it
-    //  - tap the corridor → just walk
     if (insideRect(p, layout.tower) && gameState.player.state !== 'IN_ELEVATOR') {
       const cameraY = getCameraY(gameState.player, gameState.elevator);
       const towerY = screenYToTowerY(p.y, layout, cameraY);
+      const towerX = screenXToTowerX(p.x, layout);
       const tappedFloor = Math.floor(towerY);
+
+      // Easter egg: tap the sky strip beside the lobby → back to title.
+      if (tappedFloor === LOBBY_INDEX) {
+        const onAir = towerX < WALL_WIDTH_UNITS ||
+                      towerX > TOWER_WIDTH_UNITS - WALL_WIDTH_UNITS;
+        if (onAir) {
+          gameState.scene = 'TITLE';
+          gameState.modal = null;
+          return;
+        }
+      }
+
+      // Tap on the player's current floor:
+      //  - shaft column → call the elevator AND walk to it
+      //  - corridor    → just walk
       if (tappedFloor === gameState.player.floor) {
-        const towerX = screenXToTowerX(p.x, layout);
-        // Generous tap zone for the shaft column (~1.5u wide for thumb friendliness)
         const shaftPad = 0.25;
         const onShaftDoor = towerX >= SHAFT_LEFT_X - shaftPad &&
                             towerX <= SHAFT_RIGHT_X + shaftPad;

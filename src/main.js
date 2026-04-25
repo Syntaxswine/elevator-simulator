@@ -3,9 +3,14 @@ import { computeLayout } from './layout.js';
 import { buildTower } from './tower.js';
 import { createElevator, updateElevator } from './elevator.js';
 import { createPlayer, updatePlayer } from './player.js';
+import { spawnRandomNpc, updateNpc } from './npc.js';
 import { render } from './render.js';
 import { attachInput } from './input.js';
 import { DEFAULT_SEED } from './config.js';
+
+const NPC_SPAWN_MIN_MS = 6000;
+const NPC_SPAWN_MAX_MS = 14000;
+const NPC_MAX_LIVE = 6;
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -40,13 +45,15 @@ async function start() {
   }
 
   const gameState = {
-    scene: 'TITLE',         // 'TITLE' | 'GAMEPLAY'
+    scene: 'TITLE',
     tower: buildTower(DEFAULT_SEED),
     elevator: createElevator(),
     player: createPlayer(),
-    modal: null,            // 'KEYPAD' | null
+    npcs: [],
+    modal: null,
     assets,
   };
+  let nextSpawnMs = 4000;
 
   attachInput(canvas, gameState);
 
@@ -60,6 +67,17 @@ async function start() {
     if (gameState.scene === 'GAMEPLAY') {
       updateElevator(gameState.elevator, dt);
       updatePlayer(gameState.player, dt);
+
+      // NPC update + lifecycle
+      for (const npc of gameState.npcs) updateNpc(npc, dt, gameState.elevator);
+      gameState.npcs = gameState.npcs.filter(n => n.state !== 'DESPAWNING');
+
+      // NPC spawning
+      nextSpawnMs -= dt;
+      if (nextSpawnMs <= 0 && gameState.npcs.length < NPC_MAX_LIVE) {
+        gameState.npcs.push(spawnRandomNpc());
+        nextSpawnMs = NPC_SPAWN_MIN_MS + Math.random() * (NPC_SPAWN_MAX_MS - NPC_SPAWN_MIN_MS);
+      }
     }
     const layout = computeLayout(window.innerWidth, window.innerHeight);
     render(ctx, layout, gameState);

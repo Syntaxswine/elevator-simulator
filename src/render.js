@@ -11,6 +11,7 @@ import {
 import { towerYToScreenY, towerXToScreenX } from './layout.js';
 import { isPlayerVisible } from './player.js';
 import { getCurrentFloor, isFloorCalled } from './elevator.js';
+import { isNpcVisible, npcRenderFloor, npcRenderXUnits } from './npc.js';
 
 // Background tile size (in units). Sky/dirt are large tileable images.
 const BG_TILE_UNITS = 4;
@@ -155,11 +156,67 @@ function renderTowerView(ctx, layout, gameState) {
   drawSkyAndDirt(ctx, layout, cameraY, assets);
   drawFloors(ctx, layout, cameraY, towerModel, elevator, assets);
 
+  drawNpcs(ctx, layout, cameraY, gameState.npcs ?? [], elevator, assets);
+
   if (isPlayerVisible(player, elevator)) {
     drawPlayer(ctx, layout, cameraY, player, elevator, assets);
   }
 
   ctx.restore();
+}
+
+function drawNpcs(ctx, layout, cameraY, npcs, elevator, assets) {
+  // Index NPCs currently in the elevator so we can spread them horizontally
+  let inElevatorIndex = 0;
+  for (const npc of npcs) {
+    if (!isNpcVisible(npc, elevator)) continue;
+    const orderIndex = npc.state === 'IN_ELEVATOR' ? inElevatorIndex++ : 0;
+    drawNpc(ctx, layout, cameraY, npc, elevator, assets, orderIndex);
+  }
+}
+
+function drawNpc(ctx, layout, cameraY, npc, elevator, assets, indexInElevator) {
+  const sprite = assets.player;
+  if (!sprite) return;
+  const { unitSizePx } = layout;
+
+  const ON_FLOOR_HEIGHT = 0.9;
+  const inElevator = npc.state === 'IN_ELEVATOR';
+  const heightUnits = inElevator ? ON_FLOOR_HEIGHT * 0.5 : ON_FLOOR_HEIGHT;
+  const centerXUnits = npcRenderXUnits(npc, indexInElevator);
+  const baseYUnits = npcRenderFloor(npc, elevator);
+
+  const aspect = sprite.width / sprite.height;
+  const heightPx = heightUnits * unitSizePx;
+  const widthPx = heightPx * aspect;
+  const screenCenterX = towerXToScreenX(centerXUnits, layout);
+  const screenBaseY = towerYToScreenY(baseYUnits, layout, cameraY);
+  const dx = screenCenterX - widthPx / 2;
+  const dy = screenBaseY - heightPx;
+
+  // Tint via a cached offscreen canvas so the color stays inside the
+  // sprite's silhouette and doesn't smear onto the floor.
+  const tinted = getTintedSprite(sprite, npc.color);
+  ctx.drawImage(tinted, dx, dy, widthPx, heightPx);
+}
+
+// Cache of tinted offscreen canvases keyed by color. Built once per color.
+const tintedSpriteCache = new Map();
+function getTintedSprite(sprite, color) {
+  const existing = tintedSpriteCache.get(color);
+  if (existing && existing.sprite === sprite) return existing.canvas;
+
+  const off = document.createElement('canvas');
+  off.width = sprite.width;
+  off.height = sprite.height;
+  const octx = off.getContext('2d');
+  octx.drawImage(sprite, 0, 0);
+  octx.globalCompositeOperation = 'source-atop';
+  octx.fillStyle = color;
+  octx.fillRect(0, 0, sprite.width, sprite.height);
+
+  tintedSpriteCache.set(color, { canvas: off, sprite });
+  return off;
 }
 
 function drawSkyAndDirt(ctx, layout, cameraY, assets) {

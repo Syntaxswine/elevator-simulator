@@ -24,9 +24,19 @@ export function createElevator() {
     direction: 'NONE',
     target: null,
     carCalls: new Set(),
+    upCalls: new Set(),
+    downCalls: new Set(),
     doorProgress: 0,
     dwellRemainingMs: 0,
   };
+}
+
+// External hall call from a floor (NPCs press these — the player presses
+// the modal which uses carCalls).
+export function hallCall(elevator, floorIndex, direction) {
+  if (floorIndex < 0 || floorIndex >= FLOOR_COUNT) return;
+  if (direction === 'UP') elevator.upCalls.add(floorIndex);
+  else if (direction === 'DOWN') elevator.downCalls.add(floorIndex);
 }
 
 // Floor whose y-band the elevator's bottom currently sits in (0..11).
@@ -36,7 +46,10 @@ export function getCurrentFloor(elevator) {
 
 // Whether a floor button should be lit (queued or about-to-be-serviced).
 export function isFloorCalled(elevator, floorIndex) {
-  return elevator.carCalls.has(floorIndex) || elevator.target === floorIndex;
+  return elevator.carCalls.has(floorIndex) ||
+         elevator.upCalls.has(floorIndex) ||
+         elevator.downCalls.has(floorIndex) ||
+         elevator.target === floorIndex;
 }
 
 // Player taps the Open/Close button. Toggles between opening and closing
@@ -71,6 +84,8 @@ export function processCall(elevator, floorIndex) {
   if (elevator.state === 'IDLE' &&
       Math.abs(elevator.position - floorIndex) < ARRIVAL_EPSILON) {
     elevator.position = floorIndex;
+    elevator.upCalls.delete(floorIndex);
+    elevator.downCalls.delete(floorIndex);
     transitionTo(elevator, 'DOORS_OPENING');
     return;
   }
@@ -84,26 +99,52 @@ export function processCall(elevator, floorIndex) {
 }
 
 function pickNextTarget(elevator) {
-  const calls = [...elevator.carCalls];
-  if (calls.length === 0) return null;
-  const above = calls.filter(c => c > elevator.position + ARRIVAL_EPSILON).sort((a, b) => a - b);
-  const below = calls.filter(c => c < elevator.position - ARRIVAL_EPSILON).sort((a, b) => b - a);
+  if (elevator.carCalls.size === 0 &&
+      elevator.upCalls.size === 0 &&
+      elevator.downCalls.size === 0) {
+    return null;
+  }
+  const pos = elevator.position;
+  const eps = ARRIVAL_EPSILON;
 
   if (elevator.direction === 'UP') {
-    if (above.length > 0) return above[0];
-    if (below.length > 0) { elevator.direction = 'DOWN'; return below[0]; }
-  } else if (elevator.direction === 'DOWN') {
-    if (below.length > 0) return below[0];
-    if (above.length > 0) { elevator.direction = 'UP'; return above[0]; }
-  } else {
-    // NONE: pick the closest pending call and choose direction to match.
-    const closest = [...calls].sort(
-      (a, b) => Math.abs(a - elevator.position) - Math.abs(b - elevator.position)
-    )[0];
-    elevator.direction = closest > elevator.position ? 'UP' : 'DOWN';
-    return closest;
+    // Same-direction service: carCalls + upCalls strictly above us
+    const sameDir = [];
+    for (const c of elevator.carCalls) if (c > pos + eps) sameDir.push(c);
+    for (const c of elevator.upCalls) if (c > pos + eps) sameDir.push(c);
+    if (sameDir.length > 0) return Math.min(...sameDir);
+
+    // Turnaround: highest down-call still above us — go up to it then reverse
+    const downAbove = [];
+    for (const c of elevator.downCalls) if (c > pos + eps) downAbove.push(c);
+    if (downAbove.length > 0) return Math.max(...downAbove);
+
+    // Nothing left going up — flip direction and try the other side
+    elevator.direction = 'DOWN';
+    return pickNextTarget(elevator);
   }
-  return null;
+
+  if (elevator.direction === 'DOWN') {
+    const sameDir = [];
+    for (const c of elevator.carCalls) if (c < pos - eps) sameDir.push(c);
+    for (const c of elevator.downCalls) if (c < pos - eps) sameDir.push(c);
+    if (sameDir.length > 0) return Math.max(...sameDir);
+
+    const upBelow = [];
+    for (const c of elevator.upCalls) if (c < pos - eps) upBelow.push(c);
+    if (upBelow.length > 0) return Math.min(...upBelow);
+
+    elevator.direction = 'UP';
+    return pickNextTarget(elevator);
+  }
+
+  // NONE: pick the closest pending call across all sets
+  const all = [...elevator.carCalls, ...elevator.upCalls, ...elevator.downCalls];
+  const closest = all.reduce(
+    (best, c) => Math.abs(c - pos) < Math.abs(best - pos) ? c : best
+  );
+  elevator.direction = closest > pos ? 'UP' : 'DOWN';
+  return closest;
 }
 
 function transitionTo(elevator, state) {
@@ -164,6 +205,8 @@ export function updateElevator(elevator, dt) {
       if (moveAmount >= Math.abs(remaining)) {
         elevator.position = elevator.target;
         elevator.carCalls.delete(elevator.target);
+        elevator.upCalls.delete(elevator.target);
+        elevator.downCalls.delete(elevator.target);
         elevator.target = null;
         transitionTo(elevator, 'DOORS_OPENING');
       } else {

@@ -123,12 +123,13 @@ function renderIndicator(ctx, layout, gameState) {
     ctx.drawImage(indicatorImg, indicator.x, indicator.y, indicator.w, indicator.h);
   }
 
-  // Live floor — derived from continuous position, ticks at thresholds.
   const label = FLOOR_LABELS[getCurrentFloor(elevator)] ?? '?';
   const arrow =
     elevator.direction === 'UP' ? '▲' :
     elevator.direction === 'DOWN' ? '▼' : '';
-  const text = arrow ? `${arrow} ${label}` : label;
+  const text = elevator.emergencyStopped
+    ? `⊘ STOP ${label}`
+    : (arrow ? `${arrow} ${label}` : label);
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -136,7 +137,7 @@ function renderIndicator(ctx, layout, gameState) {
   ctx.font = `bold ${fontPx}px "Courier New", monospace`;
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillText(text, indicator.x + indicator.w / 2 + 2, indicator.y + indicator.h / 2 + 2);
-  ctx.fillStyle = '#ffd060';
+  ctx.fillStyle = elevator.emergencyStopped ? '#ff4040' : '#ffd060';
   ctx.fillText(text, indicator.x + indicator.w / 2, indicator.y + indicator.h / 2);
   ctx.restore();
 }
@@ -445,6 +446,7 @@ export function computeKeypadModalArea(layout) {
 
 // Returns an array of { position, floorIndex, label, rect } for the 4×3 grid.
 // Layout: position 1 (SB) bottom-left → position 12 ("10") top-right.
+// The grid occupies the upper 4/5 of the modal; STOP gets the bottom row.
 export function computeKeypadButtons(modalArea) {
   const cols = 3;
   const rows = 4;
@@ -453,7 +455,7 @@ export function computeKeypadButtons(modalArea) {
   const gridX = modalArea.x + padX;
   const gridY = modalArea.y + padY;
   const gridW = modalArea.w - padX * 2;
-  const gridH = modalArea.h - padY * 2;
+  const gridH = (modalArea.h - padY * 2) * (4 / 5);   // leaves 1/5 for STOP
   const cellW = gridW / cols;
   const cellH = gridH / rows;
 
@@ -461,9 +463,9 @@ export function computeKeypadButtons(modalArea) {
   for (let p = 1; p <= 12; p++) {
     const floorIndex = p - 1;
     const label = FLOOR_LABELS[floorIndex];
-    const mathRow = Math.floor((p - 1) / 3);   // 0 = bottom row
+    const mathRow = Math.floor((p - 1) / 3);
     const col = (p - 1) % 3;
-    const displayRow = (rows - 1) - mathRow;   // 0 = top of screen
+    const displayRow = (rows - 1) - mathRow;
     const rect = {
       x: gridX + col * cellW + cellW * 0.1,
       y: gridY + displayRow * cellH + cellH * 0.1,
@@ -473,6 +475,20 @@ export function computeKeypadButtons(modalArea) {
     buttons.push({ position: p, floorIndex, label, rect });
   }
   return buttons;
+}
+
+// Wide STOP button below the floor grid.
+export function computeStopButtonRect(modalArea) {
+  const padX = modalArea.w * 0.08;
+  const padY = modalArea.h * 0.08;
+  const gridH = (modalArea.h - padY * 2) * (4 / 5);
+  const stopH = (modalArea.h - padY * 2) * (1 / 5);
+  return {
+    x: modalArea.x + padX,
+    y: modalArea.y + padY + gridH,
+    w: modalArea.w - padX * 2,
+    h: stopH * 0.85,
+  };
 }
 
 function renderKeypadModal(ctx, layout, gameState) {
@@ -498,6 +514,10 @@ function renderKeypadModal(ctx, layout, gameState) {
     drawKeypadButton(ctx, btn.rect, btn.label, isFloorCalled(elevator, btn.floorIndex));
   }
 
+  // STOP button (wide, latched-red when active)
+  const stopRect = computeStopButtonRect(area);
+  drawStopButton(ctx, stopRect, elevator.emergencyStopped);
+
   // Close hint
   ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
   ctx.textAlign = 'center';
@@ -505,6 +525,51 @@ function renderKeypadModal(ctx, layout, gameState) {
   const fontPx = Math.max(12, Math.floor(unitSizePx * 0.35));
   ctx.font = `bold ${fontPx}px monospace`;
   ctx.fillText('TAP OUTSIDE BUTTONS TO CLOSE', canvasWidth / 2, fontPx * 0.4);
+  ctx.restore();
+}
+
+function drawStopButton(ctx, rect, active) {
+  ctx.save();
+  // Bezel
+  ctx.fillStyle = '#1a0a0a';
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+
+  const inset = Math.min(rect.w, rect.h) * 0.06;
+  const bx = rect.x + inset, by = rect.y + inset;
+  const bw = rect.w - inset * 2, bh = rect.h - inset * 2;
+
+  if (active) {
+    ctx.shadowColor = '#ff2030';
+    ctx.shadowBlur = bh * 0.6;
+    const grad = ctx.createRadialGradient(
+      bx + bw / 2, by + bh / 2, 0,
+      bx + bw / 2, by + bh / 2, Math.max(bw, bh) / 2
+    );
+    grad.addColorStop(0, '#ff8080');
+    grad.addColorStop(0.6, '#e60010');
+    grad.addColorStop(1, '#a00000');
+    ctx.fillStyle = grad;
+  } else {
+    const grad = ctx.createLinearGradient(bx, by, bx, by + bh);
+    grad.addColorStop(0, '#a02020');
+    grad.addColorStop(1, '#600000');
+    ctx.fillStyle = grad;
+  }
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = active ? '#ffd0d0' : '#3a0a0a';
+  ctx.strokeRect(bx, by, bw, bh);
+
+  ctx.fillStyle = '#fff8f0';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const text = active ? 'STOPPED' : 'STOP';
+  // Size by width so the label always fits inside the button.
+  const fontByWidth = bw / (text.length * 0.65);
+  const fontByHeight = bh * 0.55;
+  const fontPx = Math.max(10, Math.floor(Math.min(fontByWidth, fontByHeight)));
+  ctx.font = `bold ${fontPx}px sans-serif`;
+  ctx.fillText(text, bx + bw / 2, by + bh / 2);
   ctx.restore();
 }
 

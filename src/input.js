@@ -2,9 +2,10 @@ import { computeLayout, screenYToTowerY, screenXToTowerX, getCameraY } from './l
 import {
   computeKeypadModalArea,
   computeKeypadButtons,
+  computeStopButtonRect,
   computeActionButtonRects,
 } from './render.js';
-import { processCall, toggleDoor } from './elevator.js';
+import { processCall, toggleDoor, toggleEmergencyStop } from './elevator.js';
 import { setWalkTarget, toggleInOut } from './player.js';
 
 // Pointer hit-tester. Hit regions can be larger than visual regions per the
@@ -29,13 +30,18 @@ export function attachInput(canvas, gameState) {
       return;
     }
 
-    // Modal open: floor button (queue + stay open) or anywhere else (close).
+    // Modal open: floor button (queue + stay open), STOP toggle, or close.
     if (gameState.modal === 'KEYPAD') {
       const modalArea = computeKeypadModalArea(layout);
       const buttons = computeKeypadButtons(modalArea);
       const hit = buttons.find(b => insideRect(p, expandRect(b.rect, tapPad)));
       if (hit) {
         processCall(gameState.elevator, hit.floorIndex);
+        return;
+      }
+      const stopRect = computeStopButtonRect(modalArea);
+      if (insideRect(p, expandRect(stopRect, tapPad))) {
+        toggleEmergencyStop(gameState.elevator);
         return;
       }
       gameState.modal = null;

@@ -28,7 +28,15 @@ export function createElevator() {
     downCalls: new Set(),
     doorProgress: 0,
     dwellRemainingMs: 0,
+    emergencyStopped: false,
   };
+}
+
+// Latched emergency stop. Freezes the entire car — motion, doors, dwell timer
+// — until released. Calls keep accumulating; the dispatcher resumes from
+// wherever it was when released.
+export function toggleEmergencyStop(elevator) {
+  elevator.emergencyStopped = !elevator.emergencyStopped;
 }
 
 // External hall call from a floor (NPCs press these — the player presses
@@ -164,6 +172,7 @@ function transitionTo(elevator, state) {
 }
 
 export function updateElevator(elevator, dt) {
+  if (elevator.emergencyStopped) return;
   const dtSec = dt / 1000;
 
   switch (elevator.state) {

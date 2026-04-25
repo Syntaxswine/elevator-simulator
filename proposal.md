@@ -159,20 +159,29 @@ Simple state machine: `TITLE | GAMEPLAY | PAUSED`. The keypad is a modal overlay
 Tower {
   floors: Floor[12]            // fixed
   shaftX: 4                    // shaft is 5th column (after 0.5 wall + 4 corridor)
+  seed: int                    // for deterministic tile-variant assignment
 }
 
 Floor {
   index: int                   // 0..11, bottom-up
   label: "SB" | "B" | "L" | "2" | ... | "10"
   isUnderground: bool          // true for SB, B (drives sky vs dirt)
-  tileVariant: string          // logical name of the 4×1 corridor tile, e.g. "office-1"
+  tileVariant: string          // logical name of the 4×1 corridor tile
   contents: FloorEntity[]      // empty for now; hooks for later art/NPCs
 }
 ```
 
 A small lookup maps `label ↔ index` (e.g. `"L" ↔ 2`). The label is the user-facing identifier; the index is what the elevator state machine uses.
 
-`tileVariant` lets each floor pick from a pool of corridor sprites. Initial pool: `office-1` (green-wall office), `office-2` (brick-wall industrial loft), `office-3` (high-rise office with city skyline). Lobby and basements will get their own variants when assets land. Both corridors of a floor (left and right of the shaft) use the same variant for that floor — visual coherence per floor, variety between floors.
+**Tile-variant pool and assignment:**
+
+| Floor | Variant pool |
+|---|---|
+| `SB`, `B` | `basement` (single variant; both basement floors look the same) |
+| `L` | `lobby-floor` (single variant) |
+| `2`–`10` | random pick (seeded) from `{ office-1, office-2, office-3 }` |
+
+The tower carries a `seed: int`. Tile-variant assignment for floors 2–10 is a deterministic function of the seed, so the same seed produces the same tower layout. Reroll = new seed. This also opens a future "name your tower" feature (seed = hash of the name). Both corridors of a floor (left and right of the shaft) use the same variant for that floor — visual coherence per floor, variety between floors.
 
 ### 5.3 Elevator Simulation — the most important subsystem
 
@@ -290,7 +299,7 @@ Placeholder assets land in `assets/`. The pipeline:
 - **Player sprite**: a single bathroom-sign-style pictogram. Static silhouette; no animation frames. Two render scales (on-floor full size, in-elevator shrunk inside the shaft tile). One asset, all motion via position/scale interpolation.
 - An asset manifest (`assets.json`) maps logical names → files (e.g. `"sky" → "assets/sky.png"`, `"office-1" → "assets/office-1.png"`).
 
-**Currently delivered placeholders** (in `assets/`): `sky.png`, `dirt.png`, `elevator-bank.png`, `office-1.png`, `office-2.png`, `office-3.png`. Still TBD: lobby corridor variant, basement/sub-basement variants, control panel graphic, action-button graphics, floor-indicator HUD graphic, player sprite, modal keypad button sprites.
+**Currently delivered placeholders** (in `assets/`): `sky.png`, `dirt.png`, `elevator-bank.png`, `lobby-floor.png`, `basement.png`, `office-1.png`, `office-2.png`, `office-3.png`. Still TBD: control panel graphic, action-button graphics, floor-indicator HUD graphic, player sprite, modal keypad button sprites.
 
 ## 6. Data Model Summary
 

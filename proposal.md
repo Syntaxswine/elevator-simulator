@@ -299,7 +299,7 @@ Placeholder assets land in `assets/`. The pipeline:
 - **Player sprite**: a single bathroom-sign-style pictogram. Static silhouette; no animation frames. Two render scales (on-floor full size, in-elevator shrunk inside the shaft tile). One asset, all motion via position/scale interpolation.
 - An asset manifest (`assets.json`) maps logical names → files (e.g. `"sky" → "assets/sky.png"`, `"office-1" → "assets/office-1.png"`).
 
-**Currently delivered placeholders** (in `assets/`): `sky.png`, `dirt.png`, `elevator-bank.png`, `lobby-floor.png`, `basement.png`, `office-1.png`, `office-2.png`, `office-3.png`. Still TBD: control panel graphic, action-button graphics, floor-indicator HUD graphic, player sprite, modal keypad button sprites.
+**Currently delivered placeholders** (in `assets/`): `sky.png`, `dirt.png`, `elevator-bank.png`, `lobby-floor.png`, `basement.png`, `office-1.png`, `office-2.png`, `office-3.png`, `player.png` (AIGA men's-room pictogram, public domain). Still TBD as dedicated art: control panel graphic, action-button graphics, floor-indicator HUD graphic, modal keypad button sprites — these can be canvas-drawn placeholders for the first playable build.
 
 ## 6. Data Model Summary
 

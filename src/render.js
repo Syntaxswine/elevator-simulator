@@ -21,7 +21,11 @@ export function render(ctx, layout, gameState) {
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
   if (gameState.scene === 'TITLE') {
-    renderTitleScreen(ctx, layout);
+    renderTitleScreen(ctx, layout, gameState);
+    return;
+  }
+  if (gameState.scene === 'OPTIONS') {
+    renderOptionsScreen(ctx, layout, gameState);
     return;
   }
 
@@ -52,11 +56,11 @@ const TITLE_PANEL_LINES = [
   '║ │SB│ B│ L│    ║',
   '║ └──┴──┴──┘    ║',
   '║               ║',
-  '║  ◁   ▷    ⊘   ║',
+  '║  [<] [>] [X]  ║',
   '╚═══════════════╝',
 ];
 
-function renderTitleScreen(ctx, layout) {
+function renderTitleScreen(ctx, layout, gameState) {
   const { canvasWidth, canvasHeight } = layout;
 
   ctx.fillStyle = '#0a0a14';
@@ -67,45 +71,189 @@ function renderTitleScreen(ctx, layout) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.font = `bold ${titleSize}px "Courier New", monospace`;
-  // Drop shadow + amber fill
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillText('ELEVATOR', canvasWidth / 2 + 3, canvasHeight * 0.07 + 3);
+  ctx.fillText('ELEVATOR', canvasWidth / 2 + 3, canvasHeight * 0.05 + 3);
   ctx.fillStyle = '#ffd060';
-  ctx.fillText('ELEVATOR', canvasWidth / 2, canvasHeight * 0.07);
-
+  ctx.fillText('ELEVATOR', canvasWidth / 2, canvasHeight * 0.05);
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillText('SIMULATOR', canvasWidth / 2 + 3, canvasHeight * 0.07 + titleSize + 3);
+  ctx.fillText('SIMULATOR', canvasWidth / 2 + 3, canvasHeight * 0.05 + titleSize + 3);
   ctx.fillStyle = '#ffd060';
-  ctx.fillText('SIMULATOR', canvasWidth / 2, canvasHeight * 0.07 + titleSize);
+  ctx.fillText('SIMULATOR', canvasWidth / 2, canvasHeight * 0.05 + titleSize);
 
   // ASCII control-panel art
   const lineCount = TITLE_PANEL_LINES.length;
   const maxLineLen = Math.max(...TITLE_PANEL_LINES.map(l => l.length));
-  // Fit the art to ~70% width and ~50% height
   const charW = (canvasWidth * 0.7) / maxLineLen;
-  const lineH = Math.min(charW * 1.4, (canvasHeight * 0.50) / lineCount);
+  const lineH = Math.min(charW * 1.4, (canvasHeight * 0.45) / lineCount);
   const charPx = Math.floor(lineH);
   ctx.font = `${charPx}px "Courier New", monospace`;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'center';
-  const artStartY = canvasHeight * 0.27;
-  ctx.fillStyle = '#52ff66';   // green CRT vibe for the art
+  const artStartY = canvasHeight * 0.24;
+  ctx.fillStyle = '#52ff66';
   for (let i = 0; i < lineCount; i++) {
     ctx.fillText(TITLE_PANEL_LINES[i], canvasWidth / 2, artStartY + i * lineH);
   }
 
-  // Blinking "TAP TO START" — 1Hz
-  const blink = (Math.floor(performance.now() / 500) % 2) === 0;
-  const startSize = Math.floor(canvasWidth * 0.045);
-  ctx.font = `bold ${startSize}px "Courier New", monospace`;
-  const startY = canvasHeight * 0.88;
-  if (blink) {
-    ctx.fillStyle = '#ffd060';
-    ctx.fillText('TAP TO START_', canvasWidth / 2, startY);
+  // Two buttons: START and OPTIONS
+  const btns = computeTitleButtonRects(layout);
+  drawMenuButton(ctx, btns.start, 'START', /* primary */ true);
+  drawMenuButton(ctx, btns.options, 'OPTIONS', false);
+}
+
+// Returns rects for the two main-menu buttons on the title screen.
+export function computeTitleButtonRects(layout) {
+  const { canvasWidth, canvasHeight } = layout;
+  const buttonW = canvasWidth * 0.55;
+  const buttonH = canvasHeight * 0.06;
+  const gap = canvasHeight * 0.02;
+  const totalH = buttonH * 2 + gap;
+  const startY = canvasHeight * 0.93 - totalH;
+  const x = (canvasWidth - buttonW) / 2;
+  return {
+    start:   { x, y: startY,                   w: buttonW, h: buttonH },
+    options: { x, y: startY + buttonH + gap,    w: buttonW, h: buttonH },
+  };
+}
+
+function drawMenuButton(ctx, rect, label, primary) {
+  ctx.save();
+  // Bezel
+  ctx.fillStyle = '#070710';
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+
+  const inset = Math.min(rect.w, rect.h) * 0.06;
+  const bx = rect.x + inset, by = rect.y + inset;
+  const bw = rect.w - inset * 2, bh = rect.h - inset * 2;
+
+  if (primary) {
+    const grad = ctx.createLinearGradient(bx, by, bx, by + bh);
+    grad.addColorStop(0, '#ffe680');
+    grad.addColorStop(1, '#c69a14');
+    ctx.fillStyle = grad;
   } else {
-    ctx.fillStyle = '#ffd060';
-    ctx.fillText('TAP TO START',  canvasWidth / 2, startY);
+    const grad = ctx.createLinearGradient(bx, by, bx, by + bh);
+    grad.addColorStop(0, '#243038');
+    grad.addColorStop(1, '#10161a');
+    ctx.fillStyle = grad;
   }
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = primary ? '#fff4c0' : '#52ff66';
+  ctx.strokeRect(bx, by, bw, bh);
+
+  ctx.fillStyle = primary ? '#1a1000' : '#a8ffaa';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const fontPx = Math.floor(bh * 0.5);
+  ctx.font = `bold ${fontPx}px "Courier New", monospace`;
+  ctx.fillText(label, bx + bw / 2, by + bh / 2);
+  ctx.restore();
+}
+
+// ---------- Options screen ----------
+
+const OPTIONS_LIST = [
+  { key: 'npcsEnabled', label: 'OTHER RIDERS' },
+];
+
+function renderOptionsScreen(ctx, layout, gameState) {
+  const { canvasWidth, canvasHeight } = layout;
+
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  // Title
+  const titleSize = Math.floor(canvasWidth * 0.07);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${titleSize}px "Courier New", monospace`;
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText('OPTIONS', canvasWidth / 2 + 3, canvasHeight * 0.08 + 3);
+  ctx.fillStyle = '#ffd060';
+  ctx.fillText('OPTIONS', canvasWidth / 2, canvasHeight * 0.08);
+
+  // Toggles
+  const rects = computeOptionToggleRects(layout);
+  for (const opt of OPTIONS_LIST) {
+    const r = rects[opt.key];
+    const value = !!gameState.options?.[opt.key];
+    drawOptionToggle(ctx, r, opt.label, value);
+  }
+
+  // Back button
+  const back = computeOptionsBackRect(layout);
+  drawMenuButton(ctx, back, 'BACK', false);
+}
+
+export function computeOptionToggleRects(layout) {
+  const { canvasWidth, canvasHeight } = layout;
+  const rowW = canvasWidth * 0.78;
+  const rowH = canvasHeight * 0.08;
+  const gap = canvasHeight * 0.015;
+  const startY = canvasHeight * 0.27;
+  const x = (canvasWidth - rowW) / 2;
+  const out = {};
+  OPTIONS_LIST.forEach((opt, i) => {
+    out[opt.key] = { x, y: startY + i * (rowH + gap), w: rowW, h: rowH };
+  });
+  return out;
+}
+
+export function computeOptionsBackRect(layout) {
+  const { canvasWidth, canvasHeight } = layout;
+  const buttonW = canvasWidth * 0.55;
+  const buttonH = canvasHeight * 0.06;
+  return {
+    x: (canvasWidth - buttonW) / 2,
+    y: canvasHeight * 0.86,
+    w: buttonW,
+    h: buttonH,
+  };
+}
+
+function drawOptionToggle(ctx, rect, label, on) {
+  ctx.save();
+  // Row background
+  ctx.fillStyle = '#10161a';
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = '#52ff66';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2);
+
+  // Switch first so we know how much room the label has.
+  const swH = rect.h * 0.55;
+  const swW = swH * 1.7;
+  const swPad = rect.h * 0.4;
+  const sx = rect.x + rect.w - swPad - swW;
+  const sy = rect.y + (rect.h - swH) / 2;
+
+  // Label, sized to fit the remaining width.
+  const labelX = rect.x + rect.h * 0.5;
+  const labelMax = sx - labelX - rect.h * 0.3;
+  let fontPx = Math.floor(rect.h * 0.4);
+  ctx.font = `bold ${fontPx}px "Courier New", monospace`;
+  if (ctx.measureText(label).width > labelMax) {
+    fontPx = Math.floor(fontPx * labelMax / ctx.measureText(label).width);
+    ctx.font = `bold ${fontPx}px "Courier New", monospace`;
+  }
+  ctx.fillStyle = '#a8ffaa';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, labelX, rect.y + rect.h / 2);
+
+  // Switch box on the right
+  ctx.fillStyle = on ? '#1a3a1a' : '#3a1a1a';
+  ctx.fillRect(sx, sy, swW, swH);
+  ctx.strokeStyle = on ? '#52ff66' : '#ff4040';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(sx, sy, swW, swH);
+
+  ctx.fillStyle = on ? '#a8ffaa' : '#ffaaaa';
+  ctx.textAlign = 'center';
+  ctx.font = `bold ${Math.floor(swH * 0.55)}px "Courier New", monospace`;
+  ctx.fillText(on ? 'ON' : 'OFF', sx + swW / 2, sy + swH / 2);
+  ctx.restore();
 }
 
 // ---------- Top: floor indicator HUD ----------

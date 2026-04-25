@@ -51,6 +51,9 @@ async function start() {
     player: createPlayer(),
     npcs: [],
     modal: null,
+    options: {
+      npcsEnabled: true,
+    },
     assets,
   };
   let nextSpawnMs = 4000;
@@ -72,9 +75,11 @@ async function start() {
       for (const npc of gameState.npcs) updateNpc(npc, dt, gameState.elevator);
       gameState.npcs = gameState.npcs.filter(n => n.state !== 'DESPAWNING');
 
-      // NPC spawning
+      // NPC spawning (skipped when other riders are turned off in options)
       nextSpawnMs -= dt;
-      if (nextSpawnMs <= 0 && gameState.npcs.length < NPC_MAX_LIVE) {
+      if (nextSpawnMs <= 0 &&
+          gameState.options.npcsEnabled &&
+          gameState.npcs.length < NPC_MAX_LIVE) {
         gameState.npcs.push(spawnRandomNpc());
         nextSpawnMs = NPC_SPAWN_MIN_MS + Math.random() * (NPC_SPAWN_MAX_MS - NPC_SPAWN_MIN_MS);
       }

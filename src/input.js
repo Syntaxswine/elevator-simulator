@@ -4,6 +4,9 @@ import {
   computeKeypadButtons,
   computeStopButtonRect,
   computeActionButtonRects,
+  computeTitleButtonRects,
+  computeOptionToggleRects,
+  computeOptionsBackRect,
 } from './render.js';
 import { processCall, toggleDoor, toggleEmergencyStop } from './elevator.js';
 import { setWalkTarget, toggleInOut } from './player.js';
@@ -31,9 +34,40 @@ export function attachInput(canvas, gameState) {
     const p = pointFromEvent(ev);
     const tapPad = layout.unitSizePx * 0.25;
 
-    // Title screen: any tap starts the game.
+    // Title screen: pick which button was tapped.
     if (gameState.scene === 'TITLE') {
-      gameState.scene = 'GAMEPLAY';
+      const btns = computeTitleButtonRects(layout);
+      if (insideRect(p, btns.start)) {
+        gameState.scene = 'GAMEPLAY';
+        return;
+      }
+      if (insideRect(p, btns.options)) {
+        gameState.scene = 'OPTIONS';
+        return;
+      }
+      // Tap outside the buttons → ignore (no accidental starts).
+      return;
+    }
+
+    // Options screen: toggle a row, or BACK.
+    if (gameState.scene === 'OPTIONS') {
+      const toggles = computeOptionToggleRects(layout);
+      for (const key of Object.keys(toggles)) {
+        if (insideRect(p, toggles[key])) {
+          gameState.options[key] = !gameState.options[key];
+          // When riders turn off, evict any currently-alive NPCs so the tower
+          // empties out instead of stranding them mid-trip.
+          if (key === 'npcsEnabled' && !gameState.options.npcsEnabled) {
+            gameState.npcs.length = 0;
+          }
+          return;
+        }
+      }
+      const back = computeOptionsBackRect(layout);
+      if (insideRect(p, back)) {
+        gameState.scene = 'TITLE';
+        return;
+      }
       return;
     }
 

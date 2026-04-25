@@ -84,10 +84,36 @@ A tower-setup screen is dropped for now. The 12-floor layout is fixed, so there'
 
 The earlier "widen at the base" idea is dropped — uniform floors are simpler and read better at phone sizes. (One gap to flag: this loses some silhouette interest. If we want any vertical variety later, easiest add-back is decorative facade detail, not floor-width changes.)
 
+### Unit system (load-bearing)
+
+All in-game dimensions are expressed in **units**, never pixels. One unit is derived at runtime:
+
+```
+unit_size_px = screen_width_px / 10
+```
+
+The **1×1 elevator shaft tile is the scale anchor**. Because it's square, it fixes the unit's horizontal *and* vertical size simultaneously — there is no separate vertical unit. Every other tile is a multiple:
+
+| Tile | Width × Height (units) |
+|---|---|
+| Elevator shaft | 1 × 1 |
+| Floor corridor | 4 × 1 |
+| Exterior wall | 0.5 × 1 |
+| Floor row (whole floor) | 9 × 1 (interior) / 10 × 1 (with walls) |
+
+**Consequences (these shape the rendering architecture):**
+
+1. **No fixed pixel layout.** The renderer reads canvas width, computes `unit_size_px`, and draws in unit coordinates. Resize the window or rotate the device → world re-scales smoothly. No breakpoints needed.
+2. **Visible-floor count is *derived*, not configured.** `floors_visible_at_once ≈ tower_viewport_height_px / unit_size_px`. On a tall phone, more of the tower fits; on a wider/shorter window, less. The camera handles which floors are in frame (next subsection).
+3. **Bottom region (elevator picture + panel picture) is unit-sized too.** Probably ~4 units tall, exact value tuned with the art. That fixes a known number of pixels off the bottom; whatever remains is the tower viewport, and #2 applies.
+4. **Sprites must be authored at unit-multiples.** Pick a base sprite resolution (e.g. 64 px = 1 unit) and every asset is a clean multiple. The shaft tile is the canonical 1-unit reference; everything else is sized against it.
+
+This is why the 10-unit width matters: it makes the unit-from-screen-width division clean, and the square shaft tile makes the unit consistent across both axes for free.
+
 ### Camera
 
-- **Vertical:** the tower viewport is always centered vertically on the **elevator car**. When the elevator moves, the tower scrolls past it.
-- **Horizontal:** no scroll. The 9-unit floor (plus 0.5 walls each side = 10 units) fits within the tower viewport at typical phone widths.
+- **Vertical:** the tower viewport is always centered vertically on the **elevator car**. When the elevator moves, the tower scrolls past it. How many floors are visible above and below the car is whatever fits at the current `unit_size_px` (see Unit system).
+- **Horizontal:** no scroll, ever. The full 10-unit tower width *is* the screen width by construction.
 - **Player rendering:** the player is fixed at the **horizontal middle** of their floor segment and walks left/right within the on-screen 4-wide corridor; the world doesn't scroll horizontally, the player just translates within the viewport.
 - **Player + elevator co-location (M2 default):** while there's only one call active at a time and no NPCs, the elevator stays parked at the player's floor when they walk off, so the player is always at vertical center too. They diverge only in M4 when external calls drag the elevator away.
 - **M4 edge case:** when NPC calls move the elevator off the player's floor, the player's floor scrolls off-center. They remain on that floor and need to call the car back. UX implication flagged in §7.
@@ -193,7 +219,8 @@ Hit-test dispatcher mapping screen taps to events:
 
 ### 5.5 Rendering
 
-Single canvas, split into regions each frame:
+Single canvas, split into regions each frame. **All renderers work in unit coordinates**; a single `unit_size_px` (computed from canvas width / 10) is multiplied in at draw time. State carries no pixel values.
+
 - `TowerRenderer` — floors, shaft, elevator car position, player, sky/dirt backgrounds, exterior walls, with camera offset.
 - `ElevatorPictureRenderer` — close-up of the car (lower-left) showing emoji when inside; renders ENTR/EXIT sub-buttons.
 - `PanelPictureRenderer` — schematic / sprite of the panel (lower-right).
@@ -221,6 +248,7 @@ No auto-exit; the player explicitly chooses when to leave the car.
 
 ### 5.7 Assets
 Visuals come later. The architecture assumes a sprite/tile pipeline where:
+- All sprites are authored at **unit-multiple resolutions** (e.g. base 64 px = 1 unit; the 1×1 shaft tile is 64×64, a 4×1 corridor is 256×64, a 0.5×1 wall is 32×64). Pick the base once, every asset follows.
 - Floors compose from tile sprites; sky and dirt are tiled backgrounds.
 - Elevator car has a sprite per door state (closed / opening / open / closing).
 - Panel picture and keypad button sprites with lit/unlit variants.

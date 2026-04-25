@@ -165,11 +165,14 @@ Floor {
   index: int                   // 0..11, bottom-up
   label: "SB" | "B" | "L" | "2" | ... | "10"
   isUnderground: bool          // true for SB, B (drives sky vs dirt)
+  tileVariant: string          // logical name of the 4×1 corridor tile, e.g. "office-1"
   contents: FloorEntity[]      // empty for now; hooks for later art/NPCs
 }
 ```
 
 A small lookup maps `label ↔ index` (e.g. `"L" ↔ 2`). The label is the user-facing identifier; the index is what the elevator state machine uses.
+
+`tileVariant` lets each floor pick from a pool of corridor sprites. Initial pool: `office-1` (green-wall office), `office-2` (brick-wall industrial). Lobby and basements will get their own variants when assets land. Both corridors of a floor (left and right of the shaft) use the same variant for that floor — visual coherence per floor, variety between floors.
 
 ### 5.3 Elevator Simulation — the most important subsystem
 
@@ -277,14 +280,17 @@ Movement summary:
 No auto-exit; the player explicitly toggles state.
 
 ### 5.7 Assets
-Visuals come later. The architecture assumes a sprite/tile pipeline where:
-- All sprites are authored at **unit-multiple resolutions** (e.g. base 64 px = 1 unit; the 1×1 shaft tile is 64×64, a 4×1 corridor is 256×64, a 0.5×1 wall is 32×64). Pick the base once, every asset follows.
+Placeholder assets land in `assets/`. The pipeline:
+
+- All sprites are authored at **unit-multiple resolutions**. Pick a base (e.g. 1u = 64 px) once, every asset follows. Source files can be authored at higher resolution (1024 px square is fine) — the renderer scales to runtime `unit_size_px`.
 - Floors compose from tile sprites; sky and dirt are tiled backgrounds.
-- Elevator car has a sprite per door state (closed / opening / open / closing).
-- The lower-left **elevator doors graphic** is a separate, larger close-up showing door state for visual feedback (its size in units is whatever fits in the bottom-left half of the bottom 1/3).
+- **Elevator-bank tile is double-use**: the same `elevator-bank.png` asset renders at 1u inside the tower shaft *and* at large size in the bottom-left close-up. One file, two render contexts. Door states (closed / opening / open / closing) become variants of this same asset and work at both scales.
+- Each floor picks a corridor tile variant (`office-1`, `office-2`, ...). The left and right 4×1 corridor segments of a floor use the same variant, mirrored or repeated.
 - Panel graphic and keypad button sprites with lit/unlit variants.
-- **Player sprite**: a single bathroom-sign-style pictogram. Static silhouette; no animation frames. Just two render scales (on-floor full size, in-elevator shrunk to fit the shaft tile). One asset, one figure, all motion via position/scale interpolation.
-- An asset manifest (`assets.json`) maps logical names → files. Placeholder solid rectangles until real art lands.
+- **Player sprite**: a single bathroom-sign-style pictogram. Static silhouette; no animation frames. Two render scales (on-floor full size, in-elevator shrunk inside the shaft tile). One asset, all motion via position/scale interpolation.
+- An asset manifest (`assets.json`) maps logical names → files (e.g. `"sky" → "assets/sky.png"`, `"office-1" → "assets/office-1.png"`).
+
+**Currently delivered placeholders** (in `assets/`): `sky.png`, `dirt.png`, `elevator-bank.png`, `office-1.png`, `office-2.png`. Still TBD: lobby corridor variant, basement/sub-basement variants, control panel graphic, action-button graphics, floor-indicator HUD graphic, player sprite, modal keypad button sprites.
 
 ## 6. Data Model Summary
 

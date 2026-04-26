@@ -161,6 +161,7 @@ const OPTIONS_LIST = [
   { key: 'npcCount',           label: 'OTHER RIDERS', type: 'stepper', min: 0, max: 10 },
   { key: 'workRushEnabled',    label: 'WORK RUSH',    type: 'toggle' },
   { key: 'restaurantsEnabled', label: 'RESTAURANTS',  type: 'toggle' },
+  { key: 'lunchEnabled',       label: 'LUNCH RUSH',   type: 'toggle' },
 ];
 
 // Exposed so input.js shares the list (key + type).

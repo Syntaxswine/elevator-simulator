@@ -3,7 +3,7 @@ import { computeLayout } from './layout.js';
 import { buildTower } from './tower.js';
 import { createElevator, updateElevator } from './elevator.js';
 import { createPlayer, updatePlayer } from './player.js';
-import { spawnRandomNpc, createWorker, startDeparture, updateNpc } from './npc.js';
+import { spawnRandomNpc, spawnDinerNpc, createWorker, startDeparture, updateNpc } from './npc.js';
 import { createMetrics, recordArrival } from './metrics.js';
 import { computeRushNightness } from './clock.js';
 import { render } from './render.js';
@@ -15,7 +15,20 @@ import {
   WORK_RUSH_DEPARTURE_DURATION_MS,
   WORK_RUSH_WORKER_COUNT,
   WORK_RUSH_SPAWN_STAGGER_MS,
+  LUNCH_DURATION_MS,
+  LUNCH_INTERVAL_MS,
+  RESTAURANT_VARIANTS,
 } from './config.js';
+
+const RESTAURANT_VARIANT_SET = new Set(RESTAURANT_VARIANTS);
+
+function getRestaurantFloors(tower) {
+  const out = [];
+  for (const f of tower.floors) {
+    if (RESTAURANT_VARIANT_SET.has(f.tileVariant)) out.push(f.index);
+  }
+  return out;
+}
 
 const NPC_SPAWN_MIN_MS = 6000;
 const NPC_SPAWN_MAX_MS = 14000;
@@ -25,6 +38,23 @@ function casualNpcCount(npcs) {
   let n = 0;
   for (const x of npcs) if (x.type !== 'worker') n++;
   return n;
+}
+
+// Lunch cycle: alternates between IDLE (LUNCH_INTERVAL_MS) and ACTIVE
+// (LUNCH_DURATION_MS). When the option flips off we snap back to IDLE so
+// the wave doesn't just disappear mid-stream and come back later.
+function updateLunchCycle(gameState, dt) {
+  const lunch = gameState.lunch;
+  if (!gameState.options.lunchEnabled) {
+    lunch.active = false;
+    lunch.timerMs = LUNCH_INTERVAL_MS;
+    return;
+  }
+  lunch.timerMs -= dt;
+  if (lunch.timerMs <= 0) {
+    lunch.active = !lunch.active;
+    lunch.timerMs = lunch.active ? LUNCH_DURATION_MS : LUNCH_INTERVAL_MS;
+  }
 }
 
 // After evicting NPCs, sweep the dispatcher state so we don't leave stale
@@ -127,6 +157,7 @@ async function start() {
       npcCount: 6,                  // 0 = no casual riders; up to NPC_MAX_COUNT
       workRushEnabled: false,
       restaurantsEnabled: false,    // when true, tower has 0/2/4 unique restaurants
+      lunchEnabled: false,          // when true, periodic 3-min "lunch hour" sends casuals to restaurants
     },
     metrics: createMetrics(),
     nightness: 0,                    // 0 = full day, 1 = full night; updated each frame
@@ -137,6 +168,12 @@ async function start() {
       timerMs: 0,           // countdown for the current phase
       spawnIndex: 0,        // workers spawned so far in the current arrival wave
       spawnTimerMs: 0,      // gap until the next worker in the wave
+    },
+    lunch: {
+      // First instance of the schedule-driven spawning idea: when active,
+      // new casual spawns get restaurant destinations instead of random ones.
+      active: false,
+      timerMs: LUNCH_INTERVAL_MS,
     },
     assets,
   };
@@ -173,12 +210,22 @@ async function start() {
       }
       gameState.npcs = gameState.npcs.filter(n => n.state !== 'DESPAWNING');
 
-      // Casual NPC spawning — capped by the player-chosen npcCount
+      // Casual NPC spawning — capped by the player-chosen npcCount.
+      // During an active lunch wave (and only if the tower has restaurants),
+      // new casuals are routed to a random restaurant floor instead of an
+      // arbitrary one. This is the schedule-driven destination bias.
+      updateLunchCycle(gameState, dt);
       nextSpawnMs -= dt;
       if (nextSpawnMs <= 0 &&
           gameState.options.npcCount > 0 &&
           casualNpcCount(gameState.npcs) < gameState.options.npcCount) {
-        gameState.npcs.push(spawnRandomNpc());
+        const restaurantFloors = gameState.lunch.active
+          ? getRestaurantFloors(gameState.tower)
+          : null;
+        const npc = (gameState.lunch.active && restaurantFloors && restaurantFloors.length > 0)
+          ? spawnDinerNpc(restaurantFloors)
+          : spawnRandomNpc();
+        gameState.npcs.push(npc);
         nextSpawnMs = NPC_SPAWN_MIN_MS + Math.random() * (NPC_SPAWN_MAX_MS - NPC_SPAWN_MIN_MS);
       }
 

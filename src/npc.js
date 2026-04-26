@@ -49,6 +49,25 @@ export function spawnRandomNpc() {
   return createNpc(start, dest);
 }
 
+// Lunch-wave casual: enters from a ground floor (SB/B/L) and rides up to
+// one of the restaurant floors. Caller passes the list of restaurant floor
+// indices it found on the current tower. Falls back to spawnRandomNpc if
+// the list is empty (no restaurants placed for this seed).
+export function spawnDinerNpc(restaurantFloorIndices) {
+  if (!restaurantFloorIndices || restaurantFloorIndices.length === 0) {
+    return spawnRandomNpc();
+  }
+  const start = GROUND_FLOORS[Math.floor(Math.random() * GROUND_FLOORS.length)];
+  const dest = restaurantFloorIndices[
+    Math.floor(Math.random() * restaurantFloorIndices.length)
+  ];
+  // Don't spawn at our own destination (e.g. lobby restaurant)
+  const safeStart = start === dest
+    ? GROUND_FLOORS.find(g => g !== dest) ?? start
+    : start;
+  return createNpc(safeStart, dest);
+}
+
 // Workers cycle: arrive from a ground floor (SB/B/L) → office → AT_WORK
 // → depart back to a ground floor on the next departure rush.
 const GROUND_FLOORS = [0, 1, 2];           // SB, B, L

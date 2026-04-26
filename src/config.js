@@ -41,6 +41,14 @@ export const LOBBY_VARIANT = 'lobby-floor';
 export const NPC_DEFAULT_COUNT = 6;
 export const NPC_MAX_COUNT = 10;
 
+// Lunch wave — when enabled, every LUNCH_INTERVAL_MS the spawner enters a
+// LUNCH_DURATION_MS window during which new casuals are sent straight to
+// restaurant floors instead of random destinations. First instance of the
+// "tile-attracts-visitors" pattern; future visitor schedules will plug in
+// the same way.
+export const LUNCH_DURATION_MS = 3 * 60 * 1000;
+export const LUNCH_INTERVAL_MS = 17 * 60 * 1000;
+
 // Default tower seed
 export const DEFAULT_SEED = 1337;
 

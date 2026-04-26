@@ -15,6 +15,8 @@ import {
   isNpcVisible,
   npcRenderXUnits,
   npcRenderFloor,
+  spawnDinerNpc,
+  spawnRandomNpc,
 } from '../src/npc.js';
 import { createMetrics, recordArrival } from '../src/metrics.js';
 
@@ -131,6 +133,46 @@ describe('npc: workers', () => {
     w.phase = 'ARRIVING';
     startDeparture(w);
     assertEquals(w.phase, 'ARRIVING');                  // unchanged
+  });
+});
+
+// ----- diner spawning (lunch wave) -----------------------------------
+
+describe('npc: lunch-wave diners', () => {
+  test('diners go to one of the supplied restaurant floors', () => {
+    const restaurantFloors = [4, 7, 10];
+    for (let i = 0; i < 50; i++) {
+      const n = spawnDinerNpc(restaurantFloors);
+      assertTrue(restaurantFloors.includes(n.destination),
+        `diner went to non-restaurant floor ${n.destination}`);
+      assertEquals(n.type, 'casual');
+    }
+  });
+
+  test('diners spawn on a ground floor (SB / B / L)', () => {
+    const restaurantFloors = [5];
+    for (let i = 0; i < 50; i++) {
+      const n = spawnDinerNpc(restaurantFloors);
+      assertTrue([0, 1, 2].includes(n.floor),
+        `diner spawned at non-ground floor ${n.floor}`);
+    }
+  });
+
+  test('diner never starts and ends on the same floor', () => {
+    // Restaurant on lobby — diner should pick a different ground floor
+    const restaurantFloors = [2];
+    for (let i = 0; i < 30; i++) {
+      const n = spawnDinerNpc(restaurantFloors);
+      assertTrue(n.floor !== n.destination,
+        `diner start ${n.floor} == dest ${n.destination}`);
+    }
+  });
+
+  test('with no restaurants, falls back to a random destination', () => {
+    const n = spawnDinerNpc([]);
+    assertEquals(n.type, 'casual');
+    // Just confirm it produced a valid NPC; destination is random
+    assertTrue(typeof n.destination === 'number' && n.destination >= 0);
   });
 });
 

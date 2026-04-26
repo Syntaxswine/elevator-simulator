@@ -8,7 +8,7 @@ import {
   computeOptionToggleRects,
   computeOptionsBackRect,
 } from './render.js';
-import { processCall, toggleDoor, toggleEmergencyStop } from './elevator.js';
+import { processCall, toggleDoor, toggleEmergencyStop, getCurrentFloor } from './elevator.js';
 import { setWalkTarget, toggleInOut } from './player.js';
 import {
   SHAFT_LEFT_X,
@@ -92,7 +92,20 @@ export function attachInput(canvas, gameState) {
     // Action buttons (bottom-left)
     const action = computeActionButtonRects(layout);
     if (insideRect(p, expandRect(action.openClose, tapPad))) {
-      toggleDoor(gameState.elevator);
+      // If the car's already at this floor and a door is animating or
+      // open, treat it as a manual door toggle. Otherwise, summon the
+      // car to the player's floor (which also opens the doors when it
+      // arrives).
+      const e = gameState.elevator;
+      const here = getCurrentFloor(e) === gameState.player.floor;
+      const doorsActive = e.state === 'DOORS_OPENING' ||
+                          e.state === 'DOORS_OPEN' ||
+                          e.state === 'DOORS_CLOSING';
+      if (here && doorsActive) {
+        toggleDoor(e);
+      } else {
+        processCall(e, gameState.player.floor);
+      }
       return;
     }
     if (insideRect(p, expandRect(action.inOut, tapPad))) {

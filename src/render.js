@@ -581,7 +581,7 @@ function renderBottomRegion(ctx, layout, gameState) {
 
   // 1u action buttons overlaid near the bottom of the elevator close-up.
   const buttons = computeActionButtonRects(layout);
-  drawActionButton(ctx, buttons.openClose, 'O/C');
+  drawActionButton(ctx, buttons.openClose, 'open/\nclose');
   drawActionButton(ctx, buttons.inOut, 'IN/OUT');
 
   // Bottom-right: control-panel face (elevator-button.png contained, 5u × 5u).
@@ -660,8 +660,20 @@ function drawActionButton(ctx, rect, label) {
   ctx.fillStyle = '#dcdce0';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `bold ${Math.floor(rect.h * 0.28)}px sans-serif`;
-  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  // Multi-line labels (\n separated): scale font down so two lines fit
+  // comfortably; single-line uses the original 28% size.
+  const lines = label.split('\n');
+  const fontPx = lines.length === 1
+    ? Math.floor(rect.h * 0.28)
+    : Math.floor(rect.h * 0.22);
+  ctx.font = `bold ${fontPx}px sans-serif`;
+  const lineHeight = fontPx * 1.1;
+  const totalH = lineHeight * lines.length;
+  let y = rect.y + rect.h / 2 - totalH / 2 + lineHeight / 2;
+  for (const line of lines) {
+    ctx.fillText(line, rect.x + rect.w / 2, y);
+    y += lineHeight;
+  }
   ctx.restore();
 }
 

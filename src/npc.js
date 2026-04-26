@@ -129,12 +129,30 @@ export function updateNpc(npc, dt, elevator, now = performance.now()) {
         npc.state = 'IN_ELEVATOR';
         npc.boardedAt = now;          // freeze anger from this moment
         elevator.carCalls.add(npc.destination);
+        // Clear our hall call now that we're aboard. Without this the
+        // re-press race below would have re-added it during DOORS_OPENING
+        // and left a phantom call behind for the dispatcher to chase.
+        const dir = npc.destination > npc.floor ? 'UP' : 'DOWN';
+        if (dir === 'UP') elevator.upCalls.delete(npc.floor);
+        else elevator.downCalls.delete(npc.floor);
       } else {
-        // Re-press hall call if it got cleared without us boarding
-        // (e.g. opposite-direction stop during a turnaround).
-        const direction = npc.destination > npc.floor ? 'UP' : 'DOWN';
-        const set = direction === 'UP' ? elevator.upCalls : elevator.downCalls;
-        if (!set.has(npc.floor)) hallCall(elevator, npc.floor, direction);
+        // Re-press hall call if it got cleared without us boarding (e.g.
+        // an opposite-direction stop during a turnaround). BUT skip the
+        // re-press while the elevator is actively cycling doors at our
+        // floor — otherwise the same-direction NPC who's about to board
+        // wins the race and re-adds the call between arrival-clear and
+        // boarding-clear.
+        const elevHere = getCurrentFloor(elevator) === npc.floor;
+        const doorsCycling = elevHere && (
+          elevator.state === 'DOORS_OPENING' ||
+          elevator.state === 'DOORS_OPEN' ||
+          elevator.state === 'DOORS_CLOSING'
+        );
+        if (!doorsCycling) {
+          const direction = npc.destination > npc.floor ? 'UP' : 'DOWN';
+          const set = direction === 'UP' ? elevator.upCalls : elevator.downCalls;
+          if (!set.has(npc.floor)) hallCall(elevator, npc.floor, direction);
+        }
       }
       break;
     }

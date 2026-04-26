@@ -12,6 +12,7 @@ import './clock.test.mjs';
 import './metrics.test.mjs';
 import './elevator.test.mjs';
 import './npc.test.mjs';
+import './stress.test.mjs';
 
 import { runAll } from './runner.mjs';
 runAll();

@@ -23,7 +23,11 @@ export function createElevator() {
     position: LOBBY_INDEX,
     direction: 'NONE',
     target: null,
-    carCalls: new Set(),
+    carCalls: new Set(),    // every pending stop the dispatcher must visit
+    playerCalls: new Set(), // subset of carCalls added by the player via the
+                            //   keypad / shaft tap. Used for lit-button display
+                            //   so an in-elevator NPC's destination doesn't
+                            //   light the keypad with no visible waiter.
     upCalls: new Set(),
     downCalls: new Set(),
     doorProgress: 0,
@@ -52,12 +56,14 @@ export function getCurrentFloor(elevator) {
   return clamp(Math.floor(elevator.position + 1e-9), 0, FLOOR_COUNT - 1);
 }
 
-// Whether a floor button should be lit (queued or about-to-be-serviced).
+// Whether a keypad floor button should be lit. Hall calls (someone on
+// that floor pressing up/down) and player-pressed buttons both light;
+// in-elevator NPCs' destinations stay dark so the panel reads as "who
+// is asking for service" rather than "what stops are queued."
 export function isFloorCalled(elevator, floorIndex) {
-  return elevator.carCalls.has(floorIndex) ||
-         elevator.upCalls.has(floorIndex) ||
+  return elevator.upCalls.has(floorIndex) ||
          elevator.downCalls.has(floorIndex) ||
-         elevator.target === floorIndex;
+         elevator.playerCalls.has(floorIndex);
 }
 
 // Player taps the Open/Close button. Toggles between opening and closing
@@ -94,6 +100,7 @@ export function processCall(elevator, floorIndex) {
     elevator.position = floorIndex;
     elevator.upCalls.delete(floorIndex);
     elevator.downCalls.delete(floorIndex);
+    elevator.playerCalls.delete(floorIndex);
     transitionTo(elevator, 'DOORS_OPENING');
     return;
   }
@@ -104,6 +111,7 @@ export function processCall(elevator, floorIndex) {
     return;
   }
   elevator.carCalls.add(floorIndex);
+  elevator.playerCalls.add(floorIndex);     // lit on the keypad until serviced
 }
 
 function pickNextTarget(elevator) {
@@ -216,6 +224,7 @@ export function updateElevator(elevator, dt) {
         elevator.carCalls.delete(elevator.target);
         elevator.upCalls.delete(elevator.target);
         elevator.downCalls.delete(elevator.target);
+        elevator.playerCalls.delete(elevator.target);
         elevator.target = null;
 
         // Turnaround flip: if nothing remains in the current direction

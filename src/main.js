@@ -27,6 +27,22 @@ function casualNpcCount(npcs) {
   return n;
 }
 
+// After evicting NPCs, sweep the dispatcher state so we don't leave stale
+// calls sending the elevator to empty floors (the keypad would also light
+// those buttons up). Hall calls were always NPC-originated; carCalls might
+// include both player presses (keep) and in-elevator-NPC destinations
+// (drop unless that NPC is still here).
+function rebuildCallsAfterEviction(gameState) {
+  const e = gameState.elevator;
+  e.upCalls.clear();
+  e.downCalls.clear();
+  const next = new Set([...e.playerCalls]);
+  for (const npc of gameState.npcs) {
+    if (npc.state === 'IN_ELEVATOR') next.add(npc.destination);
+  }
+  e.carCalls = next;
+}
+
 // Drives the rush cycle: 3-min initial wait → arrival wave (staggered
 // spawns) → 15 min at work → departure rush (every AT_WORK worker
 // transitions to DEPARTING) → 15 min cooldown → next arrival.
@@ -172,9 +188,9 @@ async function start() {
           gameState.rush.phase = 'WAITING_FOR_ARRIVAL';
           gameState.rush.timerMs = WORK_RUSH_INITIAL_DELAY_MS;
         } else {
-          // Evict any workers, reset rush state
           gameState.npcs = gameState.npcs.filter(n => n.type !== 'worker');
           gameState.rush.phase = 'IDLE';
+          rebuildCallsAfterEviction(gameState);
         }
         lastWorkRushEnabled = rushOn;
       }

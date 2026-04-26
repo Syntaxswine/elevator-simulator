@@ -81,17 +81,38 @@ describe('elevator: basic dispatch', () => {
     assertSetEquals(e.downCalls, [7]);
   });
 
-  test('isFloorCalled reflects all three call sets and the active target', () => {
+  test('isFloorCalled lights hall calls and player presses, not bare carCalls', () => {
+    // The keypad button is for "who is asking for service." An NPC
+    // riding inside the car (carCall but no hall call, no player press)
+    // shouldn't light up its destination floor.
     const e = createElevator();
-    e.carCalls.add(3);
+    e.carCalls.add(3);                 // bare carCall (e.g. an in-elevator NPC's destination)
     e.upCalls.add(5);
     e.downCalls.add(8);
-    e.target = 9;
-    assertTrue(isFloorCalled(e, 3));
-    assertTrue(isFloorCalled(e, 5));
-    assertTrue(isFloorCalled(e, 8));
-    assertTrue(isFloorCalled(e, 9));
+    e.playerCalls.add(7);
+    assertTrue(!isFloorCalled(e, 3), 'bare carCall should NOT light');
+    assertTrue(isFloorCalled(e, 5),  'up hall call should light');
+    assertTrue(isFloorCalled(e, 8),  'down hall call should light');
+    assertTrue(isFloorCalled(e, 7),  'player call should light');
     assertTrue(!isFloorCalled(e, 1));
+  });
+
+  test('processCall adds to playerCalls so the keypad lights up', () => {
+    const e = createElevator();
+    e.position = 0;
+    processCall(e, 7);
+    assertTrue(e.playerCalls.has(7));
+    assertTrue(isFloorCalled(e, 7));
+  });
+
+  test('arrival clears the playerCall along with the carCall', () => {
+    const e = createElevator();
+    e.position = 0;
+    processCall(e, 5);
+    runUntil(e, (e) => e.state === 'DOORS_OPEN' && Math.abs(e.position - 5) < 1e-6,
+      'arrive at 5');
+    assertTrue(!e.playerCalls.has(5), 'playerCall should be cleared on arrival');
+    assertTrue(!isFloorCalled(e, 5));
   });
 });
 

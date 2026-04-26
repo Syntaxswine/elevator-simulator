@@ -55,10 +55,17 @@ export function attachInput(canvas, gameState) {
       for (const key of Object.keys(toggles)) {
         if (insideRect(p, toggles[key])) {
           gameState.options[key] = !gameState.options[key];
-          // When riders turn off, evict any currently-alive NPCs so the tower
-          // empties out instead of stranding them mid-trip.
+          // When riders turn off, evict casual NPCs and sweep stale calls
+          // out of the dispatcher so the keypad doesn't show floors lit
+          // for nobody.
           if (key === 'npcsEnabled' && !gameState.options.npcsEnabled) {
-            gameState.npcs.length = 0;
+            gameState.npcs = gameState.npcs.filter(n => n.type === 'worker');
+            const e = gameState.elevator;
+            e.upCalls.clear();
+            e.downCalls.clear();
+            const next = new Set([...e.playerCalls]);
+            for (const n of gameState.npcs) if (n.state === 'IN_ELEVATOR') next.add(n.destination);
+            e.carCalls = next;
           }
           return;
         }

@@ -24,7 +24,7 @@ const NPC_BOARD_COL_SPACING = 0.25;
 
 let nextId = 1;
 
-export function createNpc(floor, destination) {
+export function createNpc(floor, destination, now = performance.now()) {
   const id = nextId++;
   return {
     id,
@@ -35,6 +35,9 @@ export function createNpc(floor, destination) {
     targetXOffset: SHAFT_CENTER,
     state: 'WALKING_TO_ELEVATOR',     // | 'WAITING' | 'IN_ELEVATOR' | 'EXITING' | 'WORKING' | 'DESPAWNING'
     type: 'casual',                   // | 'worker'
+    tripStartTime: now,               // for anger / arrival-time tracking
+    arrivedAt: null,                  // set when worker reaches AT_WORK
+    metricRecorded: false,
   };
 }
 
@@ -50,7 +53,7 @@ export function spawnRandomNpc() {
 const GROUND_FLOORS = [0, 1, 2];           // SB, B, L
 const OFFICE_FLOORS = [3, 4, 5, 6, 7, 8, 9, 10, 11];   // labels "2"-"10"
 
-export function createWorker() {
+export function createWorker(now = performance.now()) {
   const id = nextId++;
   const homeFloor = GROUND_FLOORS[Math.floor(Math.random() * GROUND_FLOORS.length)];
   const office = OFFICE_FLOORS[Math.floor(Math.random() * OFFICE_FLOORS.length)];
@@ -66,20 +69,26 @@ export function createWorker() {
     phase: 'ARRIVING',                // | 'AT_WORK' | 'DEPARTING'
     homeFloor,
     office,
+    tripStartTime: now,               // resets on departure
+    arrivedAt: null,
+    metricRecorded: false,
   };
 }
 
 // Called at the start of a departure rush: every worker that's AT_WORK
-// gets sent back home.
-export function startDeparture(worker) {
+// gets sent back home. Resets tripStartTime so anger is measured from
+// the moment they leave their desk, not from their original arrival.
+export function startDeparture(worker, now = performance.now()) {
   if (worker.type !== 'worker' || worker.phase !== 'AT_WORK') return;
   worker.phase = 'DEPARTING';
   worker.destination = worker.homeFloor;
   worker.state = 'WALKING_TO_ELEVATOR';
   worker.targetXOffset = SHAFT_CENTER;
+  worker.tripStartTime = now;
+  worker.arrivedAt = null;
 }
 
-export function updateNpc(npc, dt, elevator) {
+export function updateNpc(npc, dt, elevator, now = performance.now()) {
   const dtSec = dt / 1000;
   const moveAmount = NPC_SPEED * dtSec;
 
@@ -126,6 +135,7 @@ export function updateNpc(npc, dt, elevator) {
         if (npc.type === 'worker' && npc.phase === 'ARRIVING') {
           npc.state = 'WORKING';
           npc.phase = 'AT_WORK';
+          npc.arrivedAt = now;       // for metrics; main.js picks this up
         } else {
           npc.state = 'DESPAWNING';
         }

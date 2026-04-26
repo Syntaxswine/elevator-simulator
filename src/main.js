@@ -4,6 +4,7 @@ import { buildTower } from './tower.js';
 import { createElevator, updateElevator } from './elevator.js';
 import { createPlayer, updatePlayer } from './player.js';
 import { spawnRandomNpc, createWorker, startDeparture, updateNpc } from './npc.js';
+import { createMetrics, recordArrival } from './metrics.js';
 import { render } from './render.js';
 import { attachInput } from './input.js';
 import {
@@ -108,6 +109,7 @@ async function start() {
       npcsEnabled: true,
       workRushEnabled: false,
     },
+    metrics: createMetrics(),
     rush: {
       // 'IDLE' | 'WAITING_FOR_ARRIVAL' | 'SPAWNING_ARRIVAL' | 'AT_WORK' | 'DEPARTURE_RUSH'
       phase: 'IDLE',
@@ -134,7 +136,14 @@ async function start() {
       updatePlayer(gameState.player, dt);
 
       // NPC update + lifecycle
-      for (const npc of gameState.npcs) updateNpc(npc, dt, gameState.elevator);
+      for (const npc of gameState.npcs) updateNpc(npc, dt, gameState.elevator, now);
+      // Pick up newly-arrived workers' durations into the rolling average
+      for (const npc of gameState.npcs) {
+        if (npc.type === 'worker' && npc.arrivedAt && !npc.metricRecorded) {
+          recordArrival(gameState.metrics, npc.arrivedAt - npc.tripStartTime);
+          npc.metricRecorded = true;
+        }
+      }
       gameState.npcs = gameState.npcs.filter(n => n.state !== 'DESPAWNING');
 
       // Casual NPC spawning (skipped when other riders are turned off)

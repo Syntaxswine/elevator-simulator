@@ -12,6 +12,7 @@ import { towerYToScreenY, towerXToScreenX, getCameraY } from './layout.js';
 import { isPlayerVisible } from './player.js';
 import { getCurrentFloor, isFloorCalled } from './elevator.js';
 import { isNpcVisible, npcRenderFloor, npcRenderXUnits } from './npc.js';
+import { computeAnger } from './metrics.js';
 
 // Background tile size (in units). Sky/dirt are large tileable images.
 const BG_TILE_UNITS = 4;
@@ -306,7 +307,7 @@ function renderTowerView(ctx, layout, gameState) {
   drawSkyAndDirt(ctx, layout, cameraY, assets);
   drawFloors(ctx, layout, cameraY, towerModel, elevator, assets);
 
-  drawNpcs(ctx, layout, cameraY, gameState.npcs ?? [], elevator, assets);
+  drawNpcs(ctx, layout, cameraY, gameState.npcs ?? [], elevator, assets, gameState);
 
   if (isPlayerVisible(player, elevator)) {
     drawPlayer(ctx, layout, cameraY, player, elevator, assets);
@@ -315,17 +316,16 @@ function renderTowerView(ctx, layout, gameState) {
   ctx.restore();
 }
 
-function drawNpcs(ctx, layout, cameraY, npcs, elevator, assets) {
-  // Index NPCs currently in the elevator so we can spread them horizontally
+function drawNpcs(ctx, layout, cameraY, npcs, elevator, assets, gameState) {
   let inElevatorIndex = 0;
   for (const npc of npcs) {
     if (!isNpcVisible(npc, elevator)) continue;
     const orderIndex = npc.state === 'IN_ELEVATOR' ? inElevatorIndex++ : 0;
-    drawNpc(ctx, layout, cameraY, npc, elevator, assets, orderIndex);
+    drawNpc(ctx, layout, cameraY, npc, elevator, assets, orderIndex, gameState);
   }
 }
 
-function drawNpc(ctx, layout, cameraY, npc, elevator, assets, indexInElevator) {
+function drawNpc(ctx, layout, cameraY, npc, elevator, assets, indexInElevator, gameState) {
   const sprite = assets.player;
   if (!sprite) return;
   const { unitSizePx } = layout;
@@ -344,11 +344,36 @@ function drawNpc(ctx, layout, cameraY, npc, elevator, assets, indexInElevator) {
   const dx = screenCenterX - widthPx / 2;
   const dy = screenBaseY - heightPx;
 
-  // Tint via a cached offscreen canvas so the color stays inside the
-  // sprite's silhouette and doesn't smear onto the floor.
-  const tinted = getTintedSprite(sprite, npc.color);
+  const tinted = getTintedSprite(sprite, npcEffectiveColor(npc, gameState));
   ctx.drawImage(tinted, dx, dy, widthPx, heightPx);
 }
+
+// Blends an NPC's base color toward red based on how long they've been
+// in transit relative to the worker-derived rolling average. Quantized
+// to ~10 buckets so the tinted-sprite cache stays small.
+function npcEffectiveColor(npc, gameState) {
+  if (!gameState || !gameState.metrics) return npc.color;
+  if (npc.state === 'WORKING' || npc.state === 'DESPAWNING') return npc.color;
+  if (!npc.tripStartTime) return npc.color;
+  const elapsed = performance.now() - npc.tripStartTime;
+  const anger = computeAnger(elapsed, gameState.metrics.averageMs);
+  if (anger <= 0) return npc.color;
+  const aq = Math.round(anger * 10) / 10;
+  return lerpHex(npc.color, '#ff0000', aq);
+}
+
+function lerpHex(hex1, hex2, t) {
+  const a = parseHex(hex1), b = parseHex(hex2);
+  const r = Math.round(a.r + (b.r - a.r) * t);
+  const g = Math.round(a.g + (b.g - a.g) * t);
+  const bl = Math.round(a.b + (b.b - a.b) * t);
+  return '#' + h2(r) + h2(g) + h2(bl);
+}
+function parseHex(hex) {
+  const h = hex.replace('#', '');
+  return { r: parseInt(h.slice(0,2), 16), g: parseInt(h.slice(2,4), 16), b: parseInt(h.slice(4,6), 16) };
+}
+function h2(n) { return n.toString(16).padStart(2, '0'); }
 
 // Cache of tinted offscreen canvases keyed by color. Built once per color.
 const tintedSpriteCache = new Map();
@@ -560,11 +585,11 @@ function drawCloseUpRiders(ctx, layout, gameState) {
   const sprite = assets.player;
   if (!sprite) return;
 
-  // Collect everyone inside the car
+  // Collect everyone inside the car (NPC tints follow the anger blend)
   const riders = [];
   if (player.state === 'IN_ELEVATOR') riders.push({ tint: null });
   for (const npc of (npcs ?? [])) {
-    if (npc.state === 'IN_ELEVATOR') riders.push({ tint: npc.color });
+    if (npc.state === 'IN_ELEVATOR') riders.push({ tint: npcEffectiveColor(npc, gameState) });
   }
   if (riders.length === 0) return;
 

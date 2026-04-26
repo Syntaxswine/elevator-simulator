@@ -16,6 +16,7 @@ import {
   npcRenderXUnits,
   npcRenderFloor,
 } from '../src/npc.js';
+import { createMetrics, recordArrival } from '../src/metrics.js';
 
 const TICK_MS = 16;
 const TIMEOUT_MS = 60_000;
@@ -130,6 +131,50 @@ describe('npc: workers', () => {
     w.phase = 'ARRIVING';
     startDeparture(w);
     assertEquals(w.phase, 'ARRIVING');                  // unchanged
+  });
+});
+
+// ----- arrival tracking (feeds the anger metric) ---------------------
+
+describe('npc: arrival tracking', () => {
+  test('createWorker stamps tripStartTime', () => {
+    const w = createWorker(/*now*/ 1_000);
+    assertEquals(w.tripStartTime, 1_000);
+    assertEquals(w.arrivedAt, null);
+    assertTrue(!w.metricRecorded);
+  });
+
+  test('startDeparture resets tripStartTime so anger restarts', () => {
+    const w = createWorker(/*now*/ 1_000);
+    w.state = 'WORKING'; w.phase = 'AT_WORK';
+    startDeparture(w, /*now*/ 50_000);
+    assertEquals(w.tripStartTime, 50_000);
+    assertEquals(w.arrivedAt, null);
+  });
+
+  test('worker arrival fills tripStartTime → arrivedAt → metric average', () => {
+    // Drive a real simulation and confirm the timing math reaches the
+    // metrics module via the same path main.js uses.
+    const e = createElevator();
+    const m = createMetrics();
+    const w = createWorker(/*now*/ 0);
+    w.floor = 0; w.homeFloor = 0; w.office = 5; w.destination = 5;
+    const npcs = [w];
+    let now = 0;
+    while (now < TIMEOUT_MS && w.state !== 'WORKING') {
+      now += TICK_MS;
+      updateElevator(e, TICK_MS);
+      for (const n of npcs) updateNpc(n, TICK_MS, e, now);
+    }
+    assertEquals(w.state, 'WORKING');
+    assertEquals(w.arrivedAt, now);
+    // Simulate the polling loop main.js runs after every npc update tick.
+    if (w.arrivedAt && !w.metricRecorded) {
+      recordArrival(m, w.arrivedAt - w.tripStartTime);
+      w.metricRecorded = true;
+    }
+    assertTrue(m.averageMs > 0, 'average should be recorded');
+    assertEquals(m.averageMs, w.arrivedAt - w.tripStartTime);
   });
 });
 

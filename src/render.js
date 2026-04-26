@@ -348,14 +348,18 @@ function drawNpc(ctx, layout, cameraY, npc, elevator, assets, indexInElevator, g
   ctx.drawImage(tinted, dx, dy, widthPx, heightPx);
 }
 
-// Blends an NPC's base color toward red based on how long they've been
-// in transit relative to the worker-derived rolling average. Quantized
-// to ~10 buckets so the tinted-sprite cache stays small.
+// Blends an NPC's base color toward red based on how long they spent
+// waiting for the elevator, relative to the rolling average trip time.
+// Anger freezes the moment a rider boards — once they're inside the
+// car they're moving, not waiting, so the color stays at whatever
+// level they reached at boarding-time. Quantized to ~10 buckets so
+// the tinted-sprite cache stays bounded.
 function npcEffectiveColor(npc, gameState) {
   if (!gameState || !gameState.metrics) return npc.color;
   if (npc.state === 'WORKING' || npc.state === 'DESPAWNING') return npc.color;
   if (!npc.tripStartTime) return npc.color;
-  const elapsed = performance.now() - npc.tripStartTime;
+  const cutoff = npc.boardedAt ?? performance.now();
+  const elapsed = cutoff - npc.tripStartTime;
   const anger = computeAnger(elapsed, gameState.metrics.averageMs);
   if (anger <= 0) return npc.color;
   const aq = Math.round(anger * 10) / 10;

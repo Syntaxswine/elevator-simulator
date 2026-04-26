@@ -36,7 +36,8 @@ export function createNpc(floor, destination, now = performance.now()) {
     state: 'WALKING_TO_ELEVATOR',     // | 'WAITING' | 'IN_ELEVATOR' | 'EXITING' | 'WORKING' | 'DESPAWNING'
     type: 'casual',                   // | 'worker'
     tripStartTime: now,               // for anger / arrival-time tracking
-    arrivedAt: null,                  // set when worker reaches AT_WORK
+    boardedAt: null,                  // set when state → IN_ELEVATOR; freezes anger
+    arrivedAt: null,                  // set when EXITING completes
     metricRecorded: false,
   };
 }
@@ -70,6 +71,7 @@ export function createWorker(now = performance.now()) {
     homeFloor,
     office,
     tripStartTime: now,               // resets on departure
+    boardedAt: null,
     arrivedAt: null,
     metricRecorded: false,
   };
@@ -85,6 +87,7 @@ export function startDeparture(worker, now = performance.now()) {
   worker.state = 'WALKING_TO_ELEVATOR';
   worker.targetXOffset = SHAFT_CENTER;
   worker.tripStartTime = now;
+  worker.boardedAt = null;
   worker.arrivedAt = null;
 }
 
@@ -105,6 +108,7 @@ export function updateNpc(npc, dt, elevator, now = performance.now()) {
     case 'WAITING': {
       if (canBoard(npc, elevator)) {
         npc.state = 'IN_ELEVATOR';
+        npc.boardedAt = now;          // freeze anger from this moment
         elevator.carCalls.add(npc.destination);
       } else {
         // Re-press hall call if it got cleared without us boarding

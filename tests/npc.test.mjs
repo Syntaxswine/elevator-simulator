@@ -144,12 +144,29 @@ describe('npc: arrival tracking', () => {
     assertTrue(!w.metricRecorded);
   });
 
-  test('startDeparture resets tripStartTime so anger restarts', () => {
+  test('startDeparture resets tripStartTime and boardedAt so anger restarts', () => {
     const w = createWorker(/*now*/ 1_000);
-    w.state = 'WORKING'; w.phase = 'AT_WORK';
+    w.state = 'WORKING'; w.phase = 'AT_WORK'; w.boardedAt = 5_000;
     startDeparture(w, /*now*/ 50_000);
     assertEquals(w.tripStartTime, 50_000);
+    assertEquals(w.boardedAt, null);
     assertEquals(w.arrivedAt, null);
+  });
+
+  test('boardedAt is stamped on transition to IN_ELEVATOR (freezes anger)', () => {
+    // Drive a casual NPC through to boarding and verify boardedAt was set.
+    const e = createElevator();
+    const n = createNpc(2, 7, /*now*/ 0);
+    const npcs = [n];
+    let now = 0;
+    while (now < TIMEOUT_MS && n.state !== 'IN_ELEVATOR') {
+      now += TICK_MS;
+      updateElevator(e, TICK_MS);
+      for (const x of npcs) updateNpc(x, TICK_MS, e, now);
+    }
+    assertEquals(n.state, 'IN_ELEVATOR');
+    assertEquals(n.boardedAt, now,
+      'boardedAt should equal the tick at which they boarded');
   });
 
   test('worker arrival fills tripStartTime → arrivedAt → metric average', () => {

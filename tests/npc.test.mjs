@@ -176,6 +176,24 @@ describe('npc: arrival tracking', () => {
     assertTrue(m.averageMs > 0, 'average should be recorded');
     assertEquals(m.averageMs, w.arrivedAt - w.tripStartTime);
   });
+
+  test('casual rider also stamps arrivedAt on EXITING completion', () => {
+    // Same as the worker test, but for a casual NPC. Confirms casuals
+    // contribute to the same rolling average so anger has a baseline
+    // even when the work-rush option is off.
+    const e = createElevator();
+    const n = createNpc(2, 7, /*now*/ 0);
+    const npcs = [n];
+    let now = 0;
+    while (now < TIMEOUT_MS && n.state !== 'DESPAWNING') {
+      now += TICK_MS;
+      updateElevator(e, TICK_MS);
+      for (const x of npcs) updateNpc(x, TICK_MS, e, now);
+    }
+    assertEquals(n.state, 'DESPAWNING');
+    assertEquals(n.arrivedAt, now,
+      'casual should set arrivedAt the moment EXITING completes');
+  });
 });
 
 // ----- visibility & render helpers -----------------------------------

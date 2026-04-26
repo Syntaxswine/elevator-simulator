@@ -135,10 +135,13 @@ export function updateNpc(npc, dt, elevator, now = performance.now()) {
         if (npc.type === 'worker' && npc.phase === 'ARRIVING') {
           npc.state = 'WORKING';
           npc.phase = 'AT_WORK';
-          npc.arrivedAt = now;       // for metrics; main.js picks this up
         } else {
           npc.state = 'DESPAWNING';
         }
+        // Every rider that completes a trip records their arrival time;
+        // main.js feeds it into the rolling average that drives the
+        // anger curve. Casuals contribute too — same units as workers.
+        npc.arrivedAt = now;
       }
       break;
 

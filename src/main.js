@@ -137,9 +137,10 @@ async function start() {
 
       // NPC update + lifecycle
       for (const npc of gameState.npcs) updateNpc(npc, dt, gameState.elevator, now);
-      // Pick up newly-arrived workers' durations into the rolling average
+      // Pick up every newly-arrived rider's trip duration into the rolling
+      // average — workers and casuals alike contribute (same units).
       for (const npc of gameState.npcs) {
-        if (npc.type === 'worker' && npc.arrivedAt && !npc.metricRecorded) {
+        if (npc.arrivedAt && !npc.metricRecorded) {
           recordArrival(gameState.metrics, npc.arrivedAt - npc.tripStartTime);
           npc.metricRecorded = true;
         }

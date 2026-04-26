@@ -5,7 +5,11 @@
 // red when they exceed that benchmark.
 
 const MAX_SAMPLES = 20;
-export const FULL_ANGRY_OVERSHOOT_MS = 5000;   // 5s over avg = fully red
+// Riders are patient: anger only kicks in once they've waited longer than
+// the average TRIP scaled by this multiplier. 2.0 = "twice the typical
+// trip time before anyone's annoyed."
+export const PATIENCE_MULTIPLIER = 2.0;
+export const FULL_ANGRY_OVERSHOOT_MS = 5000;   // 5s past the patient threshold = fully red
 
 export function createMetrics() {
   return {
@@ -26,13 +30,14 @@ export function recordArrival(metrics, durationMs) {
 }
 
 // Maps elapsed-time-on-this-trip → anger ∈ [0, 1].
-//   elapsed ≤ avg                           → 0  (calm)
-//   elapsed = avg + FULL_ANGRY_OVERSHOOT_MS → 1  (fully red, mad)
+//   elapsed ≤ avg × PATIENCE                                      → 0  (calm)
+//   elapsed = avg × PATIENCE + FULL_ANGRY_OVERSHOOT_MS             → 1  (fully red)
 //   linear in between, clamped at 1
-//   averageMs == null (no baseline yet)     → 0
+//   averageMs == null (no baseline yet)                            → 0
 export function computeAnger(elapsedMs, averageMs) {
   if (averageMs === null || averageMs === undefined) return 0;
-  if (elapsedMs <= averageMs) return 0;
-  const overshoot = elapsedMs - averageMs;
+  const threshold = averageMs * PATIENCE_MULTIPLIER;
+  if (elapsedMs <= threshold) return 0;
+  const overshoot = elapsedMs - threshold;
   return Math.min(1, overshoot / FULL_ANGRY_OVERSHOOT_MS);
 }

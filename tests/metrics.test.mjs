@@ -9,6 +9,7 @@ import {
   recordArrival,
   computeAnger,
   FULL_ANGRY_OVERSHOOT_MS,
+  PATIENCE_MULTIPLIER,
 } from '../src/metrics.js';
 
 describe('metrics: rolling average', () => {
@@ -47,25 +48,29 @@ describe('metrics: anger curve', () => {
     assertEquals(computeAnger(60_000, null), 0);
   });
 
-  test('elapsed at or below average → calm (anger 0)', () => {
-    assertEquals(computeAnger(0, 10_000), 0);
-    assertEquals(computeAnger(5_000, 10_000), 0);
-    assertEquals(computeAnger(10_000, 10_000), 0);
-  });
-
-  test('5 seconds over average → fully red (anger 1)', () => {
-    assertEquals(computeAnger(10_000 + FULL_ANGRY_OVERSHOOT_MS, 10_000), 1);
-  });
-
-  test('linear ramp between average and average + 5s', () => {
+  test('elapsed at or below patient threshold (avg × PATIENCE) → calm', () => {
     const avg = 10_000;
-    assertNear(computeAnger(avg + 1000, avg), 0.2);
-    assertNear(computeAnger(avg + 2500, avg), 0.5);
-    assertNear(computeAnger(avg + 4000, avg), 0.8);
+    const threshold = avg * PATIENCE_MULTIPLIER;
+    assertEquals(computeAnger(0, avg), 0);
+    assertEquals(computeAnger(avg, avg), 0,        'one full average is still calm');
+    assertEquals(computeAnger(threshold, avg), 0,  'right at threshold is calm');
+  });
+
+  test('5 seconds past the patient threshold → fully red', () => {
+    const avg = 10_000;
+    const threshold = avg * PATIENCE_MULTIPLIER;
+    assertEquals(computeAnger(threshold + FULL_ANGRY_OVERSHOOT_MS, avg), 1);
+  });
+
+  test('linear ramp from threshold to threshold + 5s', () => {
+    const avg = 10_000;
+    const t = avg * PATIENCE_MULTIPLIER;
+    assertNear(computeAnger(t + 1000, avg), 0.2);
+    assertNear(computeAnger(t + 2500, avg), 0.5);
+    assertNear(computeAnger(t + 4000, avg), 0.8);
   });
 
   test('anger clamps at 1 well past full-red threshold', () => {
-    assertEquals(computeAnger(60_000, 10_000), 1);
     assertEquals(computeAnger(1_000_000, 10_000), 1);
   });
 });

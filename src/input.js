@@ -7,7 +7,11 @@ import {
   computeTitleButtonRects,
   computeOptionToggleRects,
   computeOptionsBackRect,
+  computeStepperButtons,
+  getOptionDescriptors,
 } from './render.js';
+import { buildTower } from './tower.js';
+import { DEFAULT_SEED } from './config.js';
 import { processCall, toggleDoor, toggleEmergencyStop, getCurrentFloor } from './elevator.js';
 import { setWalkTarget, toggleInOut } from './player.js';
 import {
@@ -49,26 +53,29 @@ export function attachInput(canvas, gameState) {
       return;
     }
 
-    // Options screen: toggle a row, or BACK.
+    // Options screen: toggle a row, step a row, or BACK.
     if (gameState.scene === 'OPTIONS') {
-      const toggles = computeOptionToggleRects(layout);
-      for (const key of Object.keys(toggles)) {
-        if (insideRect(p, toggles[key])) {
-          gameState.options[key] = !gameState.options[key];
-          // When riders turn off, evict casual NPCs and sweep stale calls
-          // out of the dispatcher so the keypad doesn't show floors lit
-          // for nobody.
-          if (key === 'npcsEnabled' && !gameState.options.npcsEnabled) {
-            gameState.npcs = gameState.npcs.filter(n => n.type === 'worker');
-            const e = gameState.elevator;
-            e.upCalls.clear();
-            e.downCalls.clear();
-            const next = new Set([...e.playerCalls]);
-            for (const n of gameState.npcs) if (n.state === 'IN_ELEVATOR') next.add(n.destination);
-            e.carCalls = next;
+      const rects = computeOptionToggleRects(layout);
+      const descriptors = getOptionDescriptors();
+      for (const opt of descriptors) {
+        const r = rects[opt.key];
+        if (!r || !insideRect(p, r)) continue;
+
+        if (opt.type === 'stepper') {
+          const parts = computeStepperButtons(r);
+          const cur = gameState.options[opt.key] ?? 0;
+          if (insideRect(p, expandRect(parts.dec, tapPad)) && cur > opt.min) {
+            gameState.options[opt.key] = cur - 1;
+            handleOptionChanged(opt.key, gameState);
+          } else if (insideRect(p, expandRect(parts.inc, tapPad)) && cur < opt.max) {
+            gameState.options[opt.key] = cur + 1;
+            handleOptionChanged(opt.key, gameState);
           }
-          return;
+        } else {
+          gameState.options[opt.key] = !gameState.options[opt.key];
+          handleOptionChanged(opt.key, gameState);
         }
+        return;
       }
       const back = computeOptionsBackRect(layout);
       if (insideRect(p, back)) {
@@ -168,4 +175,28 @@ function insideRect(p, r) {
 
 function expandRect(r, padding) {
   return { x: r.x - padding, y: r.y - padding, w: r.w + padding * 2, h: r.h + padding * 2 };
+}
+
+// Side effects when an option changes — evict orphaned NPCs, rebuild the
+// tower, sweep stale calls out of the dispatcher.
+function handleOptionChanged(key, gameState) {
+  if (key === 'npcCount' && gameState.options.npcCount === 0) {
+    gameState.npcs = gameState.npcs.filter(n => n.type === 'worker');
+    sweepStaleCalls(gameState);
+  }
+  if (key === 'restaurantsEnabled') {
+    const seed = gameState.tower?.seed ?? DEFAULT_SEED;
+    gameState.tower = buildTower(seed, {
+      includeRestaurants: gameState.options.restaurantsEnabled,
+    });
+  }
+}
+
+function sweepStaleCalls(gameState) {
+  const e = gameState.elevator;
+  e.upCalls.clear();
+  e.downCalls.clear();
+  const next = new Set([...e.playerCalls]);
+  for (const n of gameState.npcs) if (n.state === 'IN_ELEVATOR') next.add(n.destination);
+  e.carCalls = next;
 }

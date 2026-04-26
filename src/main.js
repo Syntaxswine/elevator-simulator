@@ -118,14 +118,15 @@ async function start() {
 
   const gameState = {
     scene: 'TITLE',
-    tower: buildTower(DEFAULT_SEED),
+    tower: buildTower(DEFAULT_SEED, { includeRestaurants: false }),
     elevator: createElevator(),
     player: createPlayer(),
     npcs: [],
     modal: null,
     options: {
-      npcsEnabled: true,
+      npcCount: 6,                  // 0 = no casual riders; up to NPC_MAX_COUNT
       workRushEnabled: false,
+      restaurantsEnabled: false,    // when true, tower has 0/2/4 unique restaurants
     },
     metrics: createMetrics(),
     nightness: 0,                    // 0 = full day, 1 = full night; updated each frame
@@ -172,11 +173,11 @@ async function start() {
       }
       gameState.npcs = gameState.npcs.filter(n => n.state !== 'DESPAWNING');
 
-      // Casual NPC spawning (skipped when other riders are turned off)
+      // Casual NPC spawning — capped by the player-chosen npcCount
       nextSpawnMs -= dt;
       if (nextSpawnMs <= 0 &&
-          gameState.options.npcsEnabled &&
-          casualNpcCount(gameState.npcs) < NPC_MAX_LIVE) {
+          gameState.options.npcCount > 0 &&
+          casualNpcCount(gameState.npcs) < gameState.options.npcCount) {
         gameState.npcs.push(spawnRandomNpc());
         nextSpawnMs = NPC_SPAWN_MIN_MS + Math.random() * (NPC_SPAWN_MAX_MS - NPC_SPAWN_MIN_MS);
       }

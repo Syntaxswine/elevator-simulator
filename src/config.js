@@ -25,15 +25,21 @@ export const INDICATOR_HEIGHT_UNITS = 1;
 export const BOTTOM_REGION_HEIGHT_UNITS = 5;   // 5u tall: two 5×5 tiles side-by-side
 
 // Tile-variant pools.
-// Above-ground non-lobby floors draw from ABOVE_GROUND_VARIANTS — a mix
-// of offices and restaurants so the building reads as mixed-use.
-export const ABOVE_GROUND_VARIANTS = [
-  'office-1', 'office-2', 'office-3',
+// Office floors are the default for every above-ground non-lobby slot.
+// Restaurants are opt-in via the OPTIONS screen — when enabled, the tower
+// places 0, 2, or 4 unique restaurant tiles (count chosen by the seed).
+export const OFFICE_VARIANTS = ['office-1', 'office-2', 'office-3'];
+export const RESTAURANT_VARIANTS = [
   'fast-food', 'sandwich-shop', 'sushi-restaurant',
   'upscale-food1', 'upscale-food2',
 ];
+export const RESTAURANT_COUNT_CHOICES = [0, 2, 4];
 export const BASEMENT_VARIANT = 'basement';
 export const LOBBY_VARIANT = 'lobby-floor';
+
+// NPC limits
+export const NPC_DEFAULT_COUNT = 6;
+export const NPC_MAX_COUNT = 10;
 
 // Default tower seed
 export const DEFAULT_SEED = 1337;

@@ -154,10 +154,17 @@ function drawMenuButton(ctx, rect, label, primary) {
 
 // ---------- Options screen ----------
 
+// Each option is one row on the OPTIONS screen. type === 'toggle' shows
+// an ON/OFF switch and flips on tap; type === 'stepper' shows a [<] N [>]
+// control with min..max bounds.
 const OPTIONS_LIST = [
-  { key: 'npcsEnabled',     label: 'OTHER RIDERS' },
-  { key: 'workRushEnabled', label: 'WORK RUSH' },
+  { key: 'npcCount',           label: 'OTHER RIDERS', type: 'stepper', min: 0, max: 10 },
+  { key: 'workRushEnabled',    label: 'WORK RUSH',    type: 'toggle' },
+  { key: 'restaurantsEnabled', label: 'RESTAURANTS',  type: 'toggle' },
 ];
+
+// Exposed so input.js shares the list (key + type).
+export function getOptionDescriptors() { return OPTIONS_LIST; }
 
 function renderOptionsScreen(ctx, layout, gameState) {
   const { canvasWidth, canvasHeight } = layout;
@@ -165,7 +172,6 @@ function renderOptionsScreen(ctx, layout, gameState) {
   ctx.fillStyle = '#0a0a14';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // Title
   const titleSize = Math.floor(canvasWidth * 0.07);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -175,17 +181,37 @@ function renderOptionsScreen(ctx, layout, gameState) {
   ctx.fillStyle = '#ffd060';
   ctx.fillText('OPTIONS', canvasWidth / 2, canvasHeight * 0.08);
 
-  // Toggles
   const rects = computeOptionToggleRects(layout);
   for (const opt of OPTIONS_LIST) {
     const r = rects[opt.key];
-    const value = !!gameState.options?.[opt.key];
-    drawOptionToggle(ctx, r, opt.label, value);
+    const value = gameState.options?.[opt.key];
+    if (opt.type === 'stepper') {
+      drawOptionStepper(ctx, r, opt.label, value ?? 0, opt.min, opt.max);
+    } else {
+      drawOptionToggle(ctx, r, opt.label, !!value);
+    }
   }
 
-  // Back button
   const back = computeOptionsBackRect(layout);
   drawMenuButton(ctx, back, 'BACK', false);
+}
+
+// Returns hit rects for the [<] and [>] sub-buttons of a stepper row.
+// Used by both render and input so they agree on geometry.
+export function computeStepperButtons(rowRect) {
+  const rect = rowRect;
+  const arrowSize = rect.h * 0.6;
+  const valueWidth = arrowSize * 1.3;
+  const padRight = rect.h * 0.4;
+  const incX = rect.x + rect.w - padRight - arrowSize;
+  const valueX = incX - valueWidth;
+  const decX = valueX - arrowSize;
+  const y = rect.y + (rect.h - arrowSize) / 2;
+  return {
+    dec:   { x: decX, y, w: arrowSize, h: arrowSize },
+    value: { x: valueX, y, w: valueWidth, h: arrowSize },
+    inc:   { x: incX, y, w: arrowSize, h: arrowSize },
+  };
 }
 
 export function computeOptionToggleRects(layout) {
@@ -212,6 +238,59 @@ export function computeOptionsBackRect(layout) {
     w: buttonW,
     h: buttonH,
   };
+}
+
+function drawOptionStepper(ctx, rect, label, value, min, max) {
+  ctx.save();
+  // Row background
+  ctx.fillStyle = '#10161a';
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = '#52ff66';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2);
+
+  const parts = computeStepperButtons(rect);
+
+  // Label, sized to fit space left of the stepper
+  const labelX = rect.x + rect.h * 0.5;
+  const labelMax = parts.dec.x - labelX - rect.h * 0.3;
+  let fontPx = Math.floor(rect.h * 0.4);
+  ctx.font = `bold ${fontPx}px "Courier New", monospace`;
+  if (ctx.measureText(label).width > labelMax) {
+    fontPx = Math.floor(fontPx * labelMax / ctx.measureText(label).width);
+    ctx.font = `bold ${fontPx}px "Courier New", monospace`;
+  }
+  ctx.fillStyle = '#a8ffaa';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, labelX, rect.y + rect.h / 2);
+
+  // [<] button (dim if at min)
+  drawArrowButton(ctx, parts.dec, '<', value > min);
+  // value display
+  ctx.fillStyle = '#fff8c0';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `bold ${Math.floor(rect.h * 0.5)}px "Courier New", monospace`;
+  ctx.fillText(String(value), parts.value.x + parts.value.w / 2, rect.y + rect.h / 2);
+  // [>] button (dim if at max)
+  drawArrowButton(ctx, parts.inc, '>', value < max);
+  ctx.restore();
+}
+
+function drawArrowButton(ctx, rect, glyph, enabled) {
+  ctx.save();
+  ctx.fillStyle = enabled ? '#1a3a1a' : '#1a1a1a';
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.strokeStyle = enabled ? '#52ff66' : '#3a3a3a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+  ctx.fillStyle = enabled ? '#a8ffaa' : '#555';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `bold ${Math.floor(rect.h * 0.7)}px "Courier New", monospace`;
+  ctx.fillText(glyph, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  ctx.restore();
 }
 
 function drawOptionToggle(ctx, rect, label, on) {

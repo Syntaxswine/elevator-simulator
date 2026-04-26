@@ -34,15 +34,57 @@ describe('tower', () => {
     }
   });
 
-  test('above-ground non-lobby floors draw from the mixed-use variant pool', () => {
-    const t = buildTower(7);
-    const allowed = new Set([
-      'office-1', 'office-2', 'office-3',
+  test('without restaurants enabled, above-ground floors are all offices', () => {
+    const offices = new Set(['office-1', 'office-2', 'office-3']);
+    for (const seed of [1, 7, 42, 1337]) {
+      const t = buildTower(seed);
+      for (let i = 3; i <= 11; i++) {
+        assertTrue(offices.has(t.floors[i].tileVariant),
+          `seed ${seed} floor ${i}: ${t.floors[i].tileVariant}`);
+      }
+    }
+  });
+
+  test('with restaurants enabled, restaurant count is 0, 2, or 4', () => {
+    const restaurants = new Set([
       'fast-food', 'sandwich-shop', 'sushi-restaurant',
       'upscale-food1', 'upscale-food2',
     ]);
-    for (let i = 3; i <= 11; i++) {
-      assertTrue(allowed.has(t.floors[i].tileVariant), `floor ${i}: ${t.floors[i].tileVariant}`);
+    for (const seed of [1, 7, 42, 1337, 99, 2025, 3, 11]) {
+      const t = buildTower(seed, { includeRestaurants: true });
+      let count = 0;
+      for (let i = 3; i <= 11; i++) {
+        if (restaurants.has(t.floors[i].tileVariant)) count++;
+      }
+      assertTrue([0, 2, 4].includes(count),
+        `seed ${seed} produced ${count} restaurants`);
+    }
+  });
+
+  test('restaurants are unique tiles (no duplicates)', () => {
+    const restaurants = new Set([
+      'fast-food', 'sandwich-shop', 'sushi-restaurant',
+      'upscale-food1', 'upscale-food2',
+    ]);
+    for (const seed of [1, 7, 42, 1337, 99]) {
+      const t = buildTower(seed, { includeRestaurants: true });
+      const placed = [];
+      for (let i = 3; i <= 11; i++) {
+        if (restaurants.has(t.floors[i].tileVariant)) {
+          placed.push(t.floors[i].tileVariant);
+        }
+      }
+      const unique = new Set(placed);
+      assertEquals(unique.size, placed.length,
+        `seed ${seed}: duplicate restaurants in ${JSON.stringify(placed)}`);
+    }
+  });
+
+  test('same seed + restaurants flag is reproducible', () => {
+    const a = buildTower(42, { includeRestaurants: true });
+    const b = buildTower(42, { includeRestaurants: true });
+    for (let i = 0; i < 12; i++) {
+      assertEquals(a.floors[i].tileVariant, b.floors[i].tileVariant, `floor ${i}`);
     }
   });
 

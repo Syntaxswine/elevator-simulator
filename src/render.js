@@ -154,7 +154,8 @@ function drawMenuButton(ctx, rect, label, primary) {
 // ---------- Options screen ----------
 
 const OPTIONS_LIST = [
-  { key: 'npcsEnabled', label: 'OTHER RIDERS' },
+  { key: 'npcsEnabled',     label: 'OTHER RIDERS' },
+  { key: 'workRushEnabled', label: 'WORK RUSH' },
 ];
 
 function renderOptionsScreen(ctx, layout, gameState) {

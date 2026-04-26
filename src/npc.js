@@ -5,6 +5,7 @@ import {
   PLAYER_X_MIN,
   PLAYER_X_MAX,
   FLOOR_COUNT,
+  WORKER_COLOR,
 } from './config.js';
 import { getCurrentFloor, hallCall } from './elevator.js';
 
@@ -31,8 +32,9 @@ export function createNpc(floor, destination) {
     floor,
     destination,
     xOffset: Math.random() < 0.5 ? PLAYER_X_MIN : PLAYER_X_MAX,
-    targetXOffset: SHAFT_CENTER,            // walk to the elevator door
-    state: 'WALKING_TO_ELEVATOR',           // | 'WAITING' | 'IN_ELEVATOR' | 'EXITING' | 'DESPAWNING'
+    targetXOffset: SHAFT_CENTER,
+    state: 'WALKING_TO_ELEVATOR',     // | 'WAITING' | 'IN_ELEVATOR' | 'EXITING' | 'WORKING' | 'DESPAWNING'
+    type: 'casual',                   // | 'worker'
   };
 }
 
@@ -41,6 +43,40 @@ export function spawnRandomNpc() {
   let dest = Math.floor(Math.random() * FLOOR_COUNT);
   while (dest === start) dest = Math.floor(Math.random() * FLOOR_COUNT);
   return createNpc(start, dest);
+}
+
+// Workers cycle: arrive from a ground floor (SB/B/L) → office → AT_WORK
+// → depart back to a ground floor on the next departure rush.
+const GROUND_FLOORS = [0, 1, 2];           // SB, B, L
+const OFFICE_FLOORS = [3, 4, 5, 6, 7, 8, 9, 10, 11];   // labels "2"-"10"
+
+export function createWorker() {
+  const id = nextId++;
+  const homeFloor = GROUND_FLOORS[Math.floor(Math.random() * GROUND_FLOORS.length)];
+  const office = OFFICE_FLOORS[Math.floor(Math.random() * OFFICE_FLOORS.length)];
+  return {
+    id,
+    color: WORKER_COLOR,
+    floor: homeFloor,
+    destination: office,
+    xOffset: Math.random() < 0.5 ? PLAYER_X_MIN : PLAYER_X_MAX,
+    targetXOffset: SHAFT_CENTER,
+    state: 'WALKING_TO_ELEVATOR',
+    type: 'worker',
+    phase: 'ARRIVING',                // | 'AT_WORK' | 'DEPARTING'
+    homeFloor,
+    office,
+  };
+}
+
+// Called at the start of a departure rush: every worker that's AT_WORK
+// gets sent back home.
+export function startDeparture(worker) {
+  if (worker.type !== 'worker' || worker.phase !== 'AT_WORK') return;
+  worker.phase = 'DEPARTING';
+  worker.destination = worker.homeFloor;
+  worker.state = 'WALKING_TO_ELEVATOR';
+  worker.targetXOffset = SHAFT_CENTER;
 }
 
 export function updateNpc(npc, dt, elevator) {
@@ -84,7 +120,20 @@ export function updateNpc(npc, dt, elevator) {
 
     case 'EXITING':
       stepToward(npc, moveAmount);
-      if (atTarget(npc)) npc.state = 'DESPAWNING';
+      if (atTarget(npc)) {
+        // Workers arriving at their office stick around as WORKING.
+        // Departing workers and casual riders both despawn at the corridor end.
+        if (npc.type === 'worker' && npc.phase === 'ARRIVING') {
+          npc.state = 'WORKING';
+          npc.phase = 'AT_WORK';
+        } else {
+          npc.state = 'DESPAWNING';
+        }
+      }
+      break;
+
+    case 'WORKING':
+      // Idle at the office until a departure rush sends them home.
       break;
 
     case 'DESPAWNING':
@@ -97,7 +146,7 @@ export function updateNpc(npc, dt, elevator) {
 export function isNpcVisible(npc, elevator) {
   if (npc.state === 'DESPAWNING') return false;
   if (npc.state === 'IN_ELEVATOR') return elevator.doorProgress > 0;
-  return true;
+  return true;  // WALKING_TO_ELEVATOR, WAITING, EXITING, WORKING all visible
 }
 
 // Render position helpers — used by render.js to handle the in-elevator case.

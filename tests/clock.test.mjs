@@ -1,58 +1,59 @@
-// clock.test.mjs — day/night cycle math.
+// clock.test.mjs — sky cycle tied to the work-rush schedule.
 //
-// Pure functions: a wrap-around time advancer and a smooth cosine
-// curve from 0 (day) to 1 (night). Verifying them in isolation
-// means the renderer's job is just "draw night-sky with this alpha"
-// — no sun-position math anywhere visual.
+// computeRushNightness traces a trapezoid over the DEPARTURE_RUSH
+// timer: 0 (full day) → 1 (full night) over the first 30%, holds at
+// 1 through the middle 40%, then 1 → 0 over the final 30%. Outside
+// of DEPARTURE_RUSH it's always 0 (full day).
 
-import { describe, test, assertEquals, assertNear, assertTrue } from './runner.mjs';
-import { computeNightness, advanceTime, DAY_LENGTH_MS } from '../src/clock.js';
+import { describe, test, assertEquals, assertNear } from './runner.mjs';
+import { computeRushNightness, SUNSET_FRACTION, DAWN_FRACTION } from '../src/clock.js';
 
-describe('clock: nightness curve', () => {
-  test('noon is fully day (nightness 0)', () => {
-    assertNear(computeNightness(0.5), 0);
-  });
+const DURATION = 100_000;     // 100 s of "departure rush" for clean math
 
-  test('midnight is fully night (nightness 1)', () => {
-    assertNear(computeNightness(0), 1);
-  });
+function rushAtProgress(progress) {
+  return { phase: 'DEPARTURE_RUSH', timerMs: DURATION * (1 - progress) };
+}
 
-  test('the curve wraps cleanly at 0 and 1', () => {
-    assertNear(computeNightness(0), computeNightness(1));
-  });
-
-  test('dawn and dusk both sit at the curve midpoint', () => {
-    assertNear(computeNightness(0.25), 0.5, 1e-6, 'dawn (0.25)');
-    assertNear(computeNightness(0.75), 0.5, 1e-6, 'dusk (0.75)');
-  });
-
-  test('curve is symmetric around noon', () => {
-    for (const off of [0.1, 0.2, 0.3]) {
-      assertNear(computeNightness(0.5 - off), computeNightness(0.5 + off));
-    }
-  });
-});
-
-describe('clock: time advance', () => {
-  test('forward by less than a day', () => {
-    const t = advanceTime(0.1, DAY_LENGTH_MS / 4);   // a quarter day
-    assertNear(t, 0.35);
-  });
-
-  test('wraps past 1.0 back into [0, 1)', () => {
-    const t = advanceTime(0.9, DAY_LENGTH_MS * 0.5);  // half a day past 0.9
-    assertNear(t, 0.4);
-  });
-
-  test('returns a value in [0, 1) regardless of dt', () => {
-    for (const dt of [0, 1, 1000, 100_000_000]) {
-      const t = advanceTime(0.5, dt);
-      assertTrue(t >= 0 && t < 1, `t=${t} for dt=${dt}`);
+describe('clock: rush-based nightness', () => {
+  test('returns 0 outside of DEPARTURE_RUSH', () => {
+    for (const phase of ['IDLE', 'WAITING_FOR_ARRIVAL', 'SPAWNING_ARRIVAL', 'AT_WORK']) {
+      assertEquals(computeRushNightness({ phase, timerMs: 1000 }, DURATION), 0,
+        `nightness should be 0 in phase ${phase}`);
     }
   });
 
-  test('custom day length scales the advance', () => {
-    // With a 10 000 ms day, dt 5 000 = half a day → 0.0 → 0.5
-    assertNear(advanceTime(0, 5000, 10000), 0.5);
+  test('returns 0 for a null/missing rush', () => {
+    assertEquals(computeRushNightness(null, DURATION), 0);
+    assertEquals(computeRushNightness(undefined, DURATION), 0);
+  });
+
+  test('full day at the start of departure (progress ≈ 0)', () => {
+    assertEquals(computeRushNightness(rushAtProgress(0), DURATION), 0);
+  });
+
+  test('peaks at 1 across the night plateau', () => {
+    // Anywhere between SUNSET_FRACTION and 1 - DAWN_FRACTION should be 1.
+    for (const p of [SUNSET_FRACTION, 0.5, 1 - DAWN_FRACTION]) {
+      assertNear(computeRushNightness(rushAtProgress(p), DURATION), 1, 1e-6,
+        `progress ${p}`);
+    }
+  });
+
+  test('linear ramp during sunset (0 → SUNSET_FRACTION)', () => {
+    assertNear(computeRushNightness(rushAtProgress(SUNSET_FRACTION / 2), DURATION), 0.5);
+  });
+
+  test('linear ramp during dawn (1 - DAWN_FRACTION → 1)', () => {
+    const midDawn = (1 - DAWN_FRACTION) + DAWN_FRACTION / 2;
+    assertNear(computeRushNightness(rushAtProgress(midDawn), DURATION), 0.5);
+  });
+
+  test('returns to full day at the end (progress = 1)', () => {
+    assertNear(computeRushNightness(rushAtProgress(1), DURATION), 0);
+  });
+
+  test('zero or negative duration is safe (returns 0)', () => {
+    assertEquals(computeRushNightness({ phase: 'DEPARTURE_RUSH', timerMs: 0 }, 0), 0);
+    assertEquals(computeRushNightness({ phase: 'DEPARTURE_RUSH', timerMs: 0 }, -1), 0);
   });
 });

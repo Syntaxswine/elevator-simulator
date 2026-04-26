@@ -1,25 +1,32 @@
-// clock.js — day/night cycle.
+// clock.js — sky cycle.
 //
-// Time is normalized: timeOfDay ∈ [0, 1)
-//   0.0  midnight    (full night)
-//   0.25 dawn        (mid-fade)
-//   0.5  noon        (full day)
-//   0.75 dusk        (mid-fade)
-//   1.0  midnight    (wraps to 0)
+// The night cycle is tied to the work-rush schedule rather than a
+// fixed real-time clock. Workers leaving = sunset; workers coming
+// back = dawn. Outside of the departure window the sky stays at full
+// daylight. This makes night feel meaningful (it's the "after-hours"
+// quiet stretch) and lets us speed through it relative to the day.
 //
-// computeNightness returns the alpha to apply to the night-sky tile
-// over the day-sky tile: 0 = pure day, 1 = pure night, smooth cosine
-// in between. The cosine curve gives a natural lingering noon and
-// long midnight with quick dawn / dusk transitions.
+// During the departure window (rush.phase === 'DEPARTURE_RUSH', which
+// starts the moment workers begin leaving and ends right before the
+// next arrival wave spawns), nightness traces a trapezoid:
+//
+//   progress       0%──────30%──────70%──────100%
+//   nightness      0 ─sunset─ 1 ─night─ 1 ─dawn─ 0
+//
+// 30% sunset, 40% deep night, 30% dawn. The deep-night plateau is
+// where the player gets a brief "the building is asleep" moment.
 
-export const DAY_LENGTH_MS = 2 * 60 * 1000;   // a full day fits in 2 real minutes
+export const SUNSET_FRACTION = 0.30;
+export const DAWN_FRACTION   = 0.30;
 
-export function computeNightness(timeOfDay) {
-  const phase = (timeOfDay - 0.5) * 2 * Math.PI;
-  return (1 - Math.cos(phase)) / 2;
-}
-
-export function advanceTime(timeOfDay, dt, dayLengthMs = DAY_LENGTH_MS) {
-  const t = (timeOfDay + dt / dayLengthMs) % 1;
-  return t < 0 ? t + 1 : t;
+// Returns 0 (full day) → 1 (full night) given the current rush state
+// and the configured DEPARTURE_RUSH duration.
+export function computeRushNightness(rush, departureDurationMs) {
+  if (!rush || rush.phase !== 'DEPARTURE_RUSH') return 0;
+  if (departureDurationMs <= 0) return 0;
+  const elapsed = departureDurationMs - rush.timerMs;
+  const progress = Math.max(0, Math.min(1, elapsed / departureDurationMs));
+  if (progress < SUNSET_FRACTION) return progress / SUNSET_FRACTION;
+  if (progress < 1 - DAWN_FRACTION) return 1;
+  return (1 - progress) / DAWN_FRACTION;
 }

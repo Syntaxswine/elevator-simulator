@@ -13,7 +13,6 @@ import { isPlayerVisible } from './player.js';
 import { getCurrentFloor, isFloorCalled } from './elevator.js';
 import { isNpcVisible, npcRenderFloor, npcRenderXUnits } from './npc.js';
 import { computeAnger } from './metrics.js';
-import { computeNightness } from './clock.js';
 
 // Background tile size (in units). Sky/dirt are large tileable images.
 const BG_TILE_UNITS = 4;
@@ -299,7 +298,7 @@ function renderTowerView(ctx, layout, gameState) {
   const { tower: rect } = layout;
   const { tower: towerModel, elevator, player, assets } = gameState;
   const cameraY = getCameraY(player, elevator);
-  const nightness = computeNightness(gameState.timeOfDay ?? 0.5);
+  const nightness = gameState.nightness ?? 0;
 
   ctx.save();
   ctx.beginPath();

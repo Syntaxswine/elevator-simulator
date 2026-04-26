@@ -1,7 +1,7 @@
 import {
   FLOOR_LABELS,
   UNDERGROUND_FLOOR_LABELS,
-  OFFICE_VARIANTS,
+  ABOVE_GROUND_VARIANTS,
   BASEMENT_VARIANT,
   LOBBY_VARIANT,
 } from './config.js';
@@ -14,7 +14,7 @@ export function buildTower(seed) {
     let tileVariant;
     if (label === 'L') tileVariant = LOBBY_VARIANT;
     else if (isUnderground) tileVariant = BASEMENT_VARIANT;
-    else tileVariant = pickRandom(rng, OFFICE_VARIANTS);
+    else tileVariant = pickRandom(rng, ABOVE_GROUND_VARIANTS);
     return { index, label, isUnderground, tileVariant, contents: [] };
   });
   return { floors, seed };

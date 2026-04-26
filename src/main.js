@@ -5,13 +5,14 @@ import { createElevator, updateElevator } from './elevator.js';
 import { createPlayer, updatePlayer } from './player.js';
 import { spawnRandomNpc, createWorker, startDeparture, updateNpc } from './npc.js';
 import { createMetrics, recordArrival } from './metrics.js';
-import { advanceTime } from './clock.js';
+import { computeRushNightness } from './clock.js';
 import { render } from './render.js';
 import { attachInput } from './input.js';
 import {
   DEFAULT_SEED,
   WORK_RUSH_INITIAL_DELAY_MS,
-  WORK_RUSH_PHASE_DURATION_MS,
+  WORK_RUSH_AT_WORK_DURATION_MS,
+  WORK_RUSH_DEPARTURE_DURATION_MS,
   WORK_RUSH_WORKER_COUNT,
   WORK_RUSH_SPAWN_STAGGER_MS,
 } from './config.js';
@@ -50,14 +51,14 @@ function updateRush(gameState, dt) {
     }
     if (r.spawnIndex >= WORK_RUSH_WORKER_COUNT) {
       r.phase = 'AT_WORK';
-      r.timerMs = WORK_RUSH_PHASE_DURATION_MS;
+      r.timerMs = WORK_RUSH_AT_WORK_DURATION_MS;
     }
   }
 
   if (r.phase === 'AT_WORK' && r.timerMs <= 0) {
     for (const npc of gameState.npcs) startDeparture(npc);
     r.phase = 'DEPARTURE_RUSH';
-    r.timerMs = WORK_RUSH_PHASE_DURATION_MS;
+    r.timerMs = WORK_RUSH_DEPARTURE_DURATION_MS;   // also drives the night cycle
   }
 
   if (r.phase === 'DEPARTURE_RUSH' && r.timerMs <= 0) {
@@ -111,7 +112,7 @@ async function start() {
       workRushEnabled: false,
     },
     metrics: createMetrics(),
-    timeOfDay: 0.4,                  // start in the morning
+    nightness: 0,                    // 0 = full day, 1 = full night; updated each frame
 
     rush: {
       // 'IDLE' | 'WAITING_FOR_ARRIVAL' | 'SPAWNING_ARRIVAL' | 'AT_WORK' | 'DEPARTURE_RUSH'
@@ -135,7 +136,11 @@ async function start() {
     const dt = Math.min(50, now - lastTime);
     lastTime = now;
     if (gameState.scene === 'GAMEPLAY') {
-      gameState.timeOfDay = advanceTime(gameState.timeOfDay, dt);
+      // Sky cycle is driven by the rush schedule — sunset starts when
+      // workers head home, dawn finishes before the next arrival wave.
+      gameState.nightness = gameState.options.workRushEnabled
+        ? computeRushNightness(gameState.rush, WORK_RUSH_DEPARTURE_DURATION_MS)
+        : 0;
       updateElevator(gameState.elevator, dt);
       updatePlayer(gameState.player, dt);
 

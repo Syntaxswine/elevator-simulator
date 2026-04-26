@@ -24,8 +24,14 @@ export const GROUND_LINE_Y = LOBBY_INDEX;  // bottom of L = top of B
 export const INDICATOR_HEIGHT_UNITS = 1;
 export const BOTTOM_REGION_HEIGHT_UNITS = 5;   // 5u tall: two 5×5 tiles side-by-side
 
-// Tile-variant pools
-export const OFFICE_VARIANTS = ['office-1', 'office-2', 'office-3'];
+// Tile-variant pools.
+// Above-ground non-lobby floors draw from ABOVE_GROUND_VARIANTS — a mix
+// of offices and restaurants so the building reads as mixed-use.
+export const ABOVE_GROUND_VARIANTS = [
+  'office-1', 'office-2', 'office-3',
+  'fast-food', 'sandwich-shop', 'sushi-restaurant',
+  'upscale-food1', 'upscale-food2',
+];
 export const BASEMENT_VARIANT = 'basement';
 export const LOBBY_VARIANT = 'lobby-floor';
 
@@ -44,8 +50,9 @@ export const PLAYER_X_MIN = WALL_WIDTH_UNITS + 0.2;
 export const PLAYER_X_MAX = TOWER_WIDTH_UNITS - WALL_WIDTH_UNITS - 0.2;
 
 // Work-rush feature
-export const WORK_RUSH_INITIAL_DELAY_MS  = 3 * 60 * 1000;     // 3 min after game start
-export const WORK_RUSH_PHASE_DURATION_MS = 15 * 60 * 1000;    // 15 min between rush events
-export const WORK_RUSH_WORKER_COUNT      = 8;                 // workers per wave
-export const WORK_RUSH_SPAWN_STAGGER_MS  = 1500;              // gap between worker spawns
-export const WORKER_COLOR                = '#505050';         // dark grey silhouette
+export const WORK_RUSH_INITIAL_DELAY_MS    = 3 * 60 * 1000;   // 3 min after game start
+export const WORK_RUSH_AT_WORK_DURATION_MS = 15 * 60 * 1000;  // 15 min day at the office
+export const WORK_RUSH_DEPARTURE_DURATION_MS = 5 * 60 * 1000; // 5 min for departure + night cycle
+export const WORK_RUSH_WORKER_COUNT        = 8;               // workers per wave
+export const WORK_RUSH_SPAWN_STAGGER_MS    = 1500;            // gap between worker spawns
+export const WORKER_COLOR                  = '#505050';       // dark grey silhouette

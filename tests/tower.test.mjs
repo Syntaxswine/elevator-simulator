@@ -34,9 +34,13 @@ describe('tower', () => {
     }
   });
 
-  test('above-ground non-lobby floors only use office variants', () => {
+  test('above-ground non-lobby floors draw from the mixed-use variant pool', () => {
     const t = buildTower(7);
-    const allowed = new Set(['office-1', 'office-2', 'office-3']);
+    const allowed = new Set([
+      'office-1', 'office-2', 'office-3',
+      'fast-food', 'sandwich-shop', 'sushi-restaurant',
+      'upscale-food1', 'upscale-food2',
+    ]);
     for (let i = 3; i <= 11; i++) {
       assertTrue(allowed.has(t.floors[i].tileVariant), `floor ${i}: ${t.floors[i].tileVariant}`);
     }

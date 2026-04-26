@@ -217,6 +217,25 @@ export function updateElevator(elevator, dt) {
         elevator.upCalls.delete(elevator.target);
         elevator.downCalls.delete(elevator.target);
         elevator.target = null;
+
+        // Turnaround flip: if nothing remains in the current direction
+        // (no carCalls or matching hall-calls strictly past us), flip
+        // direction now so riders waiting at this apex/nadir for the
+        // opposite direction can board on this stop instead of having
+        // to wait a full round-trip.
+        const wasUp = elevator.state === 'MOVING_UP';
+        const sameDirHallCalls = wasUp ? elevator.upCalls : elevator.downCalls;
+        const past = (c) => wasUp ? c > elevator.position + ARRIVAL_EPSILON
+                                  : c < elevator.position - ARRIVAL_EPSILON;
+        let hasMoreSameDir = false;
+        for (const c of elevator.carCalls)     if (past(c)) { hasMoreSameDir = true; break; }
+        if (!hasMoreSameDir) {
+          for (const c of sameDirHallCalls)    if (past(c)) { hasMoreSameDir = true; break; }
+        }
+        if (!hasMoreSameDir) {
+          elevator.direction = wasUp ? 'DOWN' : 'UP';
+        }
+
         transitionTo(elevator, 'DOORS_OPENING');
       } else {
         elevator.position += moveDir * moveAmount;

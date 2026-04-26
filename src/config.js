@@ -31,7 +31,7 @@ export const BOTTOM_REGION_HEIGHT_UNITS = 5;   // 5u tall: two 5×5 tiles side-b
 export const OFFICE_VARIANTS = ['office-1', 'office-2', 'office-3'];
 export const RESTAURANT_VARIANTS = [
   'fast-food', 'sandwich-shop', 'sushi-restaurant',
-  'upscale-food1', 'upscale-food2',
+  'upscale-food1', 'upscale-food2', 'coffee-shop',
 ];
 export const RESTAURANT_COUNT_CHOICES = [0, 2, 4];
 export const BASEMENT_VARIANT = 'basement';

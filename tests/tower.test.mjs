@@ -48,7 +48,7 @@ describe('tower', () => {
   test('with restaurants enabled, restaurant count is 0, 2, or 4', () => {
     const restaurants = new Set([
       'fast-food', 'sandwich-shop', 'sushi-restaurant',
-      'upscale-food1', 'upscale-food2',
+      'upscale-food1', 'upscale-food2', 'coffee-shop',
     ]);
     for (const seed of [1, 7, 42, 1337, 99, 2025, 3, 11]) {
       const t = buildTower(seed, { includeRestaurants: true });
@@ -64,7 +64,7 @@ describe('tower', () => {
   test('restaurants are unique tiles (no duplicates)', () => {
     const restaurants = new Set([
       'fast-food', 'sandwich-shop', 'sushi-restaurant',
-      'upscale-food1', 'upscale-food2',
+      'upscale-food1', 'upscale-food2', 'coffee-shop',
     ]);
     for (const seed of [1, 7, 42, 1337, 99]) {
       const t = buildTower(seed, { includeRestaurants: true });

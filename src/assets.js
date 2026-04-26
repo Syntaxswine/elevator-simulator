@@ -13,6 +13,7 @@ export const ASSET_MANIFEST = {
   'sushi-restaurant':'assets/sushi-restaurant.png',
   'upscale-food1':   'assets/upscale-food1.png',
   'upscale-food2':   'assets/upscale-food2.png',
+  'coffee-shop':     'assets/coffee-shop.png',
   player:            'assets/player.png',
   'elevator-button':        'assets/elevator-button.png',
   'floor-indicator':        'assets/floor-indicator.png',

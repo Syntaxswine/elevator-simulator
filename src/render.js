@@ -13,6 +13,7 @@ import { isPlayerVisible } from './player.js';
 import { getCurrentFloor, isFloorCalled } from './elevator.js';
 import { isNpcVisible, npcRenderFloor, npcRenderXUnits } from './npc.js';
 import { computeAnger } from './metrics.js';
+import { computeNightness } from './clock.js';
 
 // Background tile size (in units). Sky/dirt are large tileable images.
 const BG_TILE_UNITS = 4;
@@ -298,13 +299,14 @@ function renderTowerView(ctx, layout, gameState) {
   const { tower: rect } = layout;
   const { tower: towerModel, elevator, player, assets } = gameState;
   const cameraY = getCameraY(player, elevator);
+  const nightness = computeNightness(gameState.timeOfDay ?? 0.5);
 
   ctx.save();
   ctx.beginPath();
   ctx.rect(rect.x, rect.y, rect.w, rect.h);
   ctx.clip();
 
-  drawSkyAndDirt(ctx, layout, cameraY, assets);
+  drawSkyAndDirt(ctx, layout, cameraY, assets, nightness);
   drawFloors(ctx, layout, cameraY, towerModel, elevator, assets);
 
   drawNpcs(ctx, layout, cameraY, gameState.npcs ?? [], elevator, assets, gameState);
@@ -398,14 +400,25 @@ function getTintedSprite(sprite, color) {
   return off;
 }
 
-function drawSkyAndDirt(ctx, layout, cameraY, assets) {
+function drawSkyAndDirt(ctx, layout, cameraY, assets, nightness = 0) {
   const { tower: rect, unitSizePx } = layout;
   const groundScreenY = towerYToScreenY(GROUND_LINE_Y, layout, cameraY);
+  const skyHeight = Math.max(0, groundScreenY - rect.y);
 
+  // Day sky always drawn (the night sky is overlaid on top with alpha).
   drawTiledRegion(ctx, assets.sky,
-    rect.x, rect.y,
-    rect.w, Math.max(0, groundScreenY - rect.y),
+    rect.x, rect.y, rect.w, skyHeight,
     unitSizePx * BG_TILE_UNITS);
+
+  // Night sky crossfade — 0 (full day) → 1 (full night).
+  if (nightness > 0 && assets['night-sky']) {
+    ctx.save();
+    ctx.globalAlpha = nightness;
+    drawTiledRegion(ctx, assets['night-sky'],
+      rect.x, rect.y, rect.w, skyHeight,
+      unitSizePx * BG_TILE_UNITS);
+    ctx.restore();
+  }
 
   drawTiledRegion(ctx, assets.dirt,
     rect.x, Math.max(rect.y, groundScreenY),

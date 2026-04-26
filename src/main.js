@@ -5,6 +5,7 @@ import { createElevator, updateElevator } from './elevator.js';
 import { createPlayer, updatePlayer } from './player.js';
 import { spawnRandomNpc, createWorker, startDeparture, updateNpc } from './npc.js';
 import { createMetrics, recordArrival } from './metrics.js';
+import { advanceTime } from './clock.js';
 import { render } from './render.js';
 import { attachInput } from './input.js';
 import {
@@ -110,6 +111,8 @@ async function start() {
       workRushEnabled: false,
     },
     metrics: createMetrics(),
+    timeOfDay: 0.4,                  // start in the morning
+
     rush: {
       // 'IDLE' | 'WAITING_FOR_ARRIVAL' | 'SPAWNING_ARRIVAL' | 'AT_WORK' | 'DEPARTURE_RUSH'
       phase: 'IDLE',
@@ -132,6 +135,7 @@ async function start() {
     const dt = Math.min(50, now - lastTime);
     lastTime = now;
     if (gameState.scene === 'GAMEPLAY') {
+      gameState.timeOfDay = advanceTime(gameState.timeOfDay, dt);
       updateElevator(gameState.elevator, dt);
       updatePlayer(gameState.player, dt);
 

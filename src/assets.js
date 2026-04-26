@@ -1,5 +1,6 @@
 export const ASSET_MANIFEST = {
   sky:               'assets/sky.png',
+  'night-sky':       'assets/night-sky.png',
   dirt:              'assets/dirt.png',
   'elevator-bank':   'assets/elevator-bank.png',
   'lobby-floor':     'assets/lobby-floor.png',

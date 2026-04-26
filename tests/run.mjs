@@ -8,6 +8,7 @@
 import './rng.test.mjs';
 import './tower.test.mjs';
 import './layout.test.mjs';
+import './clock.test.mjs';
 import './metrics.test.mjs';
 import './elevator.test.mjs';
 import './npc.test.mjs';

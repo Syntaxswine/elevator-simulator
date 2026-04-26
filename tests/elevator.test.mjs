@@ -199,6 +199,42 @@ describe('elevator: regression suite', () => {
       'arrive at floor 0');
     assertEquals(e.direction, 'NONE');
   });
+
+  // Reported by playtest: idle elevator picks the closest call even when
+  // that call's direction conflicts with the trip the elevator would take
+  // to reach it. Going DOWN to an upCall with downCalls still further
+  // below = a wasted stop where nobody boards (rider wants UP, dispatcher
+  // is committed to DOWN because the apex-flip sees more sameDir below).
+  test('regression: idle picker prefers naturally-served calls', () => {
+    const e = createElevator();
+    e.position = 9;
+    hallCall(e, 1, 'DOWN');            // natural DOWN target
+    hallCall(e, 5, 'UP');               // closer but conflicts with DOWN trip
+    // Run one tick — pickNextTarget runs in IDLE
+    updateElevator(e, TICK_MS);
+    assertEquals(e.target, 1, 'should head to the DOWN call (natural), not the closer UP call');
+    assertEquals(e.direction, 'DOWN');
+  });
+
+  test('regression: elevator going DOWN does not stop at intermediate upCalls', () => {
+    const e = createElevator();
+    e.position = 9;
+    hallCall(e, 1, 'DOWN');
+    hallCall(e, 5, 'UP');
+    const stops = [];
+    runUntil(e, (e) => {
+      if (e.state === 'DOORS_OPEN') {
+        const f = Math.round(e.position);
+        if (stops.at(-1) !== f) stops.push(f);
+      }
+      return e.carCalls.size === 0 && e.upCalls.size === 0 &&
+             e.downCalls.size === 0 && e.state === 'IDLE';
+    }, 'all calls serviced');
+    // Expected sequence: down to 1 (downCall), turnaround, up to 5 (upCall).
+    // Stopping at 5 going DOWN would be a wasted stop.
+    assertEquals(JSON.stringify(stops), JSON.stringify([1, 5]),
+      `unexpected stop sequence: ${JSON.stringify(stops)}`);
+  });
 });
 
 // ----- doors and emergency stop --------------------------------------

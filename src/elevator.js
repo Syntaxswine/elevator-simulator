@@ -154,13 +154,33 @@ function pickNextTarget(elevator) {
     return pickNextTarget(elevator);
   }
 
-  // NONE: pick the closest pending call across all sets
-  const all = [...elevator.carCalls, ...elevator.upCalls, ...elevator.downCalls];
-  const closest = all.reduce(
-    (best, c) => Math.abs(c - pos) < Math.abs(best - pos) ? c : best
-  );
-  elevator.direction = closest > pos ? 'UP' : 'DOWN';
-  return closest;
+  // NONE: prefer a call whose direction matches the trip we'd take to
+  // reach it. Otherwise we pick e.g. an upCall below us, head DOWN to
+  // it, and find ourselves stopped at a floor where the rider can't
+  // board because we're committed to the wrong direction. (Reported
+  // by playtest.)
+  let bestTarget = null, bestDist = Infinity, bestDir = null;
+  function consider(floor, dir) {
+    const dist = Math.abs(floor - pos);
+    if (dist < bestDist) { bestDist = dist; bestTarget = floor; bestDir = dir; }
+  }
+  // 1. Calls at the current floor — open doors here, no trip needed.
+  for (const c of elevator.carCalls)  if (Math.abs(c - pos) < eps) return c;
+  for (const c of elevator.upCalls)   if (Math.abs(c - pos) < eps) return c;
+  for (const c of elevator.downCalls) if (Math.abs(c - pos) < eps) return c;
+  // 2. Naturally-served calls (call's direction matches the trip direction):
+  //    going UP serves carCalls + upCalls above us;
+  //    going DOWN serves carCalls + downCalls below us.
+  for (const c of elevator.carCalls)  { if (c > pos + eps) consider(c, 'UP'); else if (c < pos - eps) consider(c, 'DOWN'); }
+  for (const c of elevator.upCalls)   if (c > pos + eps) consider(c, 'UP');
+  for (const c of elevator.downCalls) if (c < pos - eps) consider(c, 'DOWN');
+  if (bestTarget !== null) { elevator.direction = bestDir; return bestTarget; }
+  // 3. Only turnaround targets remain — go to the closest one and serve
+  //    it as the apex of the trip, then flip on arrival.
+  for (const c of elevator.downCalls) if (c > pos + eps) consider(c, 'UP');
+  for (const c of elevator.upCalls)   if (c < pos - eps) consider(c, 'DOWN');
+  if (bestTarget !== null) { elevator.direction = bestDir; return bestTarget; }
+  return null;
 }
 
 function transitionTo(elevator, state) {

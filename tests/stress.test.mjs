@@ -24,6 +24,19 @@ import {
   startDeparture,
   updateNpc,
 } from '../src/npc.js';
+import { createRng } from '../src/rng.js';
+
+// Deterministic Math.random override so stress runs are reproducible
+// across machines and across test ordering. Tests that share global
+// state (this whole module) are easier to debug when they fail the
+// same way every time.
+function withSeededRandom(seed, fn) {
+  const rng = createRng(seed);
+  const original = Math.random;
+  Math.random = rng;
+  try { fn(); }
+  finally { Math.random = original; }
+}
 
 const TICK_MS = 16;
 const SIM_END_MS = 10 * 60 * 1000;       // 10 simulated minutes
@@ -38,7 +51,7 @@ const STUCK_LIMITS = {
 };
 
 describe('stress: long-run NPC behavior', () => {
-  test('10-minute busy simulation — no rider stuck in any state', () => {
+  test('10-minute busy simulation — no rider stuck in any state', () => withSeededRandom(1, () => {
     const e = createElevator();
     const npcs = [];
     let simTime = 0;
@@ -100,9 +113,9 @@ describe('stress: long-run NPC behavior', () => {
     }
 
     assertEquals(stuck.length, 0, `${stuck.length} stuck NPCs out of ${npcs.length}`);
-  });
+  }));
 
-  test('10-minute busy simulation — no leaked hall calls', () => {
+  test('10-minute busy simulation — no leaked hall calls', () => withSeededRandom(2, () => {
     const e = createElevator();
     const npcs = [];
     let simTime = 0;
@@ -133,9 +146,9 @@ describe('stress: long-run NPC behavior', () => {
     for (const f of e.downCalls) if (!activeWaiter(f, 'DOWN')) leaks.push({ floor: f, direction: 'DOWN' });
 
     assertEquals(leaks.length, 0, `leaked hall calls: ${JSON.stringify(leaks)}`);
-  });
+  }));
 
-  test('worker arrival cycle: 8 workers, all reach AT_WORK on their office floor', () => {
+  test('worker arrival cycle: 8 workers, all reach AT_WORK on their office floor', () => withSeededRandom(3, () => {
     const e = createElevator();
     const workers = [];
     for (let i = 0; i < 8; i++) workers.push(createWorker(0));
@@ -154,9 +167,9 @@ describe('stress: long-run NPC behavior', () => {
       assertEquals(w.floor, w.office,
         `worker ${w.id} ended on floor ${w.floor}, expected office ${w.office}`);
     }
-  });
+  }));
 
-  test('worker departure cycle: every AT_WORK worker reaches their home floor', () => {
+  test('worker departure cycle: every AT_WORK worker reaches their home floor', () => withSeededRandom(4, () => {
     const e = createElevator();
     const workers = [];
     // Pre-place 6 workers AT_WORK on various offices
@@ -185,9 +198,77 @@ describe('stress: long-run NPC behavior', () => {
       assertEquals(w.floor, w.homeFloor,
         `worker ${w.id} despawned on floor ${w.floor}, expected home ${w.homeFloor}`);
     }
-  });
+  }));
 
-  test('lunch wave: 12 diners going to one restaurant all reach it', () => {
+  test('player sits in the elevator the whole sim — no NPC anomalies', () => withSeededRandom(5, () => {
+    // The player is just a state object; the dispatcher and NPCs don't
+    // know about them. But it's worth confirming that nothing in the
+    // game-loop pattern accidentally inserts the player into carCalls
+    // or otherwise changes how NPCs flow.
+    const e = createElevator();
+    const player = {
+      state: 'IN_ELEVATOR',
+      floor: 2,                  // boarded at lobby; never updates
+      xOffset: 5,
+    };
+    const npcs = [];
+    let simTime = 0;
+    let nextSpawn = 1000;
+    const lastTransition = new Map();
+
+    while (simTime < SIM_END_MS) {
+      simTime += TICK_MS;
+      nextSpawn -= TICK_MS;
+      const live = npcs.filter(n => n.state !== 'DESPAWNING' && n.type === 'casual').length;
+      if (nextSpawn <= 0 && live < 8) {
+        npcs.push(spawnRandomNpc());
+        nextSpawn = 4000 + Math.random() * 4000;
+      }
+      updateElevator(e, TICK_MS);
+      for (const n of npcs) updateNpc(n, TICK_MS, e, simTime);
+      for (const n of npcs) {
+        const prev = lastTransition.get(n.id);
+        if (!prev || prev.state !== n.state) {
+          lastTransition.set(n.id, { state: n.state, t: simTime });
+        }
+      }
+    }
+
+    // Player still riding
+    assertEquals(player.state, 'IN_ELEVATOR', 'player should still be IN_ELEVATOR');
+
+    // No leaked hall calls (same check as the no-player sim)
+    function activeWaiter(floor, direction) {
+      return npcs.some(n =>
+        n.state === 'WAITING' && n.floor === floor &&
+        ((direction === 'UP'   && n.destination > n.floor) ||
+         (direction === 'DOWN' && n.destination < n.floor)));
+    }
+    const leaks = [];
+    for (const f of e.upCalls)   if (!activeWaiter(f, 'UP'))   leaks.push({ floor: f, direction: 'UP' });
+    for (const f of e.downCalls) if (!activeWaiter(f, 'DOWN')) leaks.push({ floor: f, direction: 'DOWN' });
+    assertEquals(leaks.length, 0, `leaks with sitting player: ${JSON.stringify(leaks)}`);
+
+    // No riders stuck (same thresholds as the no-player sim)
+    const stuck = [];
+    for (const n of npcs) {
+      if (n.state === 'DESPAWNING' || n.state === 'WORKING') continue;
+      const last = lastTransition.get(n.id);
+      const limit = STUCK_LIMITS[n.state];
+      if (limit === undefined) continue;
+      const dur = simTime - last.t;
+      if (dur > limit) stuck.push({ id: n.id, state: n.state, durationMs: dur });
+    }
+    assertEquals(stuck.length, 0, `stuck NPCs with sitting player: ${JSON.stringify(stuck.slice(0,3))}`);
+
+    // Most casuals should have despawned over 10 minutes — confirms the
+    // elevator was actually doing work, not orbiting the player floor.
+    const despawned = npcs.filter(n => n.state === 'DESPAWNING').length;
+    assertTrue(despawned > 5,
+      `expected NPCs to complete trips during sim, got ${despawned}`);
+  }));
+
+  test('lunch wave: 12 diners going to one restaurant all reach it', () => withSeededRandom(6, () => {
     const e = createElevator();
     const restaurantFloors = [7];   // single restaurant — worst case for crowding
     const diners = [];
@@ -205,5 +286,5 @@ describe('stress: long-run NPC behavior', () => {
     for (const d of diners) {
       assertEquals(d.floor, 7, `diner ${d.id} ended on floor ${d.floor}`);
     }
-  });
+  }));
 });

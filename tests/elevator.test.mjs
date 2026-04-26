@@ -173,28 +173,31 @@ describe('elevator: regression suite', () => {
     assertTrue(visited9, 'expected to stop at 9');
   });
 
-  // FIXED in commit cc99546. When the elevator arrives at a turnaround
-  // floor (highest pending request while going up), direction stays UP
-  // until the next pickNextTarget call (after doors close). A rider
-  // waiting at that floor for the OPPOSITE direction would fail
-  // canBoard's direction check and miss the elevator entirely.
-  test('regression: direction flips on apex arrival when no same-dir calls remain', () => {
+  // FIXED in commit cc99546, refined later. When the elevator arrives at
+  // a turnaround floor (highest pending request while going up), direction
+  // stays UP until the next pickNextTarget call (after doors close). A
+  // rider waiting at that floor for the OPPOSITE direction would fail
+  // canBoard's direction check. The fix: at apex/nadir, set direction =
+  // NONE so riders of EITHER direction can board this stop. (Previously
+  // we FLIPPED, which broke same-direction riders — see the player-sim
+  // stress test that surfaced that.)
+  test('regression: apex sets direction NONE so any rider can board there', () => {
     const e = createElevator();
     e.position = 5;
     hallCall(e, 11, 'DOWN');           // turnaround request at the top
     runUntil(e, (e) => e.state === 'DOORS_OPEN' && Math.abs(e.position - 11) < 1e-6,
       'arrive at floor 11');
-    assertEquals(e.direction, 'DOWN',
-      'direction should have flipped to DOWN so a downward rider can board');
+    assertEquals(e.direction, 'NONE',
+      'direction should be NONE at apex so either-direction riders can board');
   });
 
-  test('regression: nadir flip works the same way (DOWN trip then UP rider)', () => {
+  test('regression: nadir works the same way (DOWN trip then UP rider)', () => {
     const e = createElevator();
     e.position = 6;
     hallCall(e, 0, 'UP');              // turnaround at the bottom
     runUntil(e, (e) => e.state === 'DOORS_OPEN' && Math.abs(e.position - 0) < 1e-6,
       'arrive at floor 0');
-    assertEquals(e.direction, 'UP');
+    assertEquals(e.direction, 'NONE');
   });
 });
 

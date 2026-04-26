@@ -227,11 +227,14 @@ export function updateElevator(elevator, dt) {
         elevator.playerCalls.delete(elevator.target);
         elevator.target = null;
 
-        // Turnaround flip: if nothing remains in the current direction
-        // (no carCalls or matching hall-calls strictly past us), flip
-        // direction now so riders waiting at this apex/nadir for the
-        // opposite direction can board on this stop instead of having
-        // to wait a full round-trip.
+        // Turnaround at apex / nadir: if nothing remains in the current
+        // direction (no carCalls or same-direction hall-calls strictly past
+        // us), set direction = NONE so riders of EITHER direction can board
+        // this stop. The next pickNextTarget after doors close picks the
+        // new trip direction from whatever's left. Note: outright FLIPPING
+        // here was wrong — it lets opposite-direction riders board (good)
+        // but blocks same-direction riders who'd been waiting for this very
+        // call (bad). NONE serves both.
         const wasUp = elevator.state === 'MOVING_UP';
         const sameDirHallCalls = wasUp ? elevator.upCalls : elevator.downCalls;
         const past = (c) => wasUp ? c > elevator.position + ARRIVAL_EPSILON
@@ -242,7 +245,7 @@ export function updateElevator(elevator, dt) {
           for (const c of sameDirHallCalls)    if (past(c)) { hasMoreSameDir = true; break; }
         }
         if (!hasMoreSameDir) {
-          elevator.direction = wasUp ? 'DOWN' : 'UP';
+          elevator.direction = 'NONE';
         }
 
         transitionTo(elevator, 'DOORS_OPENING');

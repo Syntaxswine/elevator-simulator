@@ -438,6 +438,8 @@ function drawNpc(ctx, layout, cameraY, npc, elevator, assets, indexInElevator, g
 // level they reached at boarding-time. Quantized to ~10 buckets so
 // the tinted-sprite cache stays bounded.
 function npcEffectiveColor(npc, gameState) {
+  // Hell exposure trumps everything — once you've seen hell, you stay red.
+  if (npc.hellExposed) return '#ff0000';
   if (!gameState || !gameState.metrics) return npc.color;
   if (npc.state === 'WORKING' || npc.state === 'DESPAWNING') return npc.color;
   if (!npc.tripStartTime) return npc.color;
@@ -595,8 +597,10 @@ function drawFloors(ctx, layout, cameraY, towerModel, elevator, assets) {
 }
 
 function drawPlayer(ctx, layout, cameraY, player, elevator, assets) {
-  const sprite = assets.player;
-  if (!sprite) return;
+  const baseSprite = assets.player;
+  if (!baseSprite) return;
+  // Hell exposure paints the player figure red too.
+  const sprite = player.hellExposed ? getTintedSprite(baseSprite, '#ff0000') : baseSprite;
   const { unitSizePx } = layout;
 
   const ON_FLOOR_HEIGHT = 0.9;
@@ -683,9 +687,11 @@ function drawCloseUpRiders(ctx, layout, gameState) {
   const sprite = assets.player;
   if (!sprite) return;
 
-  // Collect everyone inside the car (NPC tints follow the anger blend)
+  // Collect everyone inside the car (tints follow anger / hell exposure)
   const riders = [];
-  if (player.state === 'IN_ELEVATOR') riders.push({ tint: null });
+  if (player.state === 'IN_ELEVATOR') {
+    riders.push({ tint: player.hellExposed ? '#ff0000' : null });
+  }
   for (const npc of (npcs ?? [])) {
     if (npc.state === 'IN_ELEVATOR') riders.push({ tint: npcEffectiveColor(npc, gameState) });
   }

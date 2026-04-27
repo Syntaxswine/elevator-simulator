@@ -255,6 +255,66 @@ describe('npc: arrival tracking', () => {
   });
 });
 
+// ----- hell exposure -------------------------------------------------
+
+describe('npc: hell exposure', () => {
+  test('NPCs do not get exposed without the hell option', () => {
+    const e = createElevator();
+    const n = createNpc(0, 5);          // start on SB
+    n.state = 'WAITING';
+    const towerNoHell = { floors: [{ tileVariant: 'basement' }] };
+    updateNpc(n, 16, e, 0, towerNoHell);
+    assertTrue(!n.hellExposed);
+  });
+
+  test('NPCs on the hell floor get exposed', () => {
+    const e = createElevator();
+    const n = createNpc(0, 5);
+    n.state = 'WAITING'; n.floor = 0;
+    const towerHell = { floors: [{ tileVariant: 'hell-floor' }] };
+    updateNpc(n, 16, e, 0, towerHell);
+    assertTrue(n.hellExposed);
+  });
+
+  test('NPCs in the elevator get exposed when doors open at hell floor', () => {
+    const e = createElevator();
+    e.position = 0;
+    e.state = 'DOORS_OPEN';
+    e.doorProgress = 1;
+    const n = createNpc(2, 7);
+    n.state = 'IN_ELEVATOR';
+    const towerHell = { floors: [{ tileVariant: 'hell-floor' }] };
+    updateNpc(n, 16, e, 0, towerHell);
+    assertTrue(n.hellExposed);
+  });
+
+  test('NPCs in the elevator are NOT exposed if doors are closed at hell', () => {
+    const e = createElevator();
+    e.position = 0;
+    e.state = 'IDLE';
+    e.doorProgress = 0;
+    const n = createNpc(2, 7);
+    n.state = 'IN_ELEVATOR';
+    const towerHell = { floors: [{ tileVariant: 'hell-floor' }] };
+    updateNpc(n, 16, e, 0, towerHell);
+    assertTrue(!n.hellExposed);
+  });
+
+  test('hellExposed is sticky — once true, stays true after leaving', () => {
+    const e = createElevator();
+    const n = createNpc(0, 5);
+    n.state = 'WAITING'; n.floor = 0;
+    const towerHell = { floors: [{ tileVariant: 'hell-floor' }] };
+    updateNpc(n, 16, e, 0, towerHell);
+    assertTrue(n.hellExposed);
+    // Move them off the hell floor; flag should persist
+    n.floor = 5;
+    n.state = 'WALKING_TO_ELEVATOR';
+    updateNpc(n, 16, e, 0, towerHell);
+    assertTrue(n.hellExposed);
+  });
+});
+
 // ----- visibility & render helpers -----------------------------------
 
 describe('npc: visibility & render helpers', () => {

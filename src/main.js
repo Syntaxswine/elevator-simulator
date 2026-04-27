@@ -197,10 +197,12 @@ async function start() {
         ? computeRushNightness(gameState.rush, WORK_RUSH_DEPARTURE_DURATION_MS)
         : 0;
       updateElevator(gameState.elevator, dt);
-      updatePlayer(gameState.player, dt);
+      updatePlayer(gameState.player, dt, gameState.elevator, gameState.tower);
 
-      // NPC update + lifecycle
-      for (const npc of gameState.npcs) updateNpc(npc, dt, gameState.elevator, now);
+      // NPC update + lifecycle (tower is needed for hell-exposure check)
+      for (const npc of gameState.npcs) {
+        updateNpc(npc, dt, gameState.elevator, now, gameState.tower);
+      }
       // Pick up every newly-arrived rider's trip duration into the rolling
       // average — workers and casuals alike contribute (same units).
       for (const npc of gameState.npcs) {

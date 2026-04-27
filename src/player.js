@@ -7,6 +7,7 @@ import {
   PLAYER_SPEED,
   PLAYER_X_MIN,
   PLAYER_X_MAX,
+  HELL_VARIANT,
 } from './config.js';
 import { getCurrentFloor } from './elevator.js';
 
@@ -16,6 +17,7 @@ export function createPlayer() {
     xOffset: WALL_WIDTH_UNITS + CORRIDOR_WIDTH_UNITS / 2,  // middle of left corridor
     targetXOffset: WALL_WIDTH_UNITS + CORRIDOR_WIDTH_UNITS / 2,
     state: 'IDLE',  // 'IDLE' | 'SLIDING' | 'IN_ELEVATOR'
+    hellExposed: false,
   };
 }
 
@@ -52,7 +54,19 @@ export function toggleInOut(player, elevator) {
   }
 }
 
-export function updatePlayer(player, dt) {
+export function updatePlayer(player, dt, elevator = null, tower = null) {
+  // Hell exposure: same rule as NPCs — sticky red when standing on
+  // the hell floor or seeing it through open elevator doors.
+  if (!player.hellExposed && tower?.floors?.[0]?.tileVariant === HELL_VARIANT) {
+    if (player.state === 'IN_ELEVATOR') {
+      if (elevator && Math.floor(elevator.position) === 0 && elevator.doorProgress > 0) {
+        player.hellExposed = true;
+      }
+    } else if (player.floor === 0) {
+      player.hellExposed = true;
+    }
+  }
+
   if (player.state !== 'SLIDING') return;
   const dtSec = dt / 1000;
   const moveAmount = PLAYER_SPEED * dtSec;

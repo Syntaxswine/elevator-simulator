@@ -6,6 +6,7 @@ import {
   PLAYER_X_MAX,
   FLOOR_COUNT,
   WORKER_COLOR,
+  HELL_VARIANT,
 } from './config.js';
 import { getCurrentFloor, hallCall } from './elevator.js';
 
@@ -39,6 +40,7 @@ export function createNpc(floor, destination, now = performance.now()) {
     boardedAt: null,                  // set when state → IN_ELEVATOR; freezes anger
     arrivedAt: null,                  // set when EXITING completes
     metricRecorded: false,
+    hellExposed: false,               // sticky flag — once set, sprite renders fully red
   };
 }
 
@@ -93,6 +95,7 @@ export function createWorker(now = performance.now()) {
     boardedAt: null,
     arrivedAt: null,
     metricRecorded: false,
+    hellExposed: false,
   };
 }
 
@@ -110,7 +113,21 @@ export function startDeparture(worker, now = performance.now()) {
   worker.arrivedAt = null;
 }
 
-export function updateNpc(npc, dt, elevator, now = performance.now()) {
+export function updateNpc(npc, dt, elevator, now = performance.now(), tower = null) {
+  // Hell exposure: if the SB floor is the hellscape and this NPC sees
+  // it (standing on floor 0, or in the elevator with doors open at
+  // floor 0), mark them. Sticky — they render red for the rest of
+  // their life.
+  if (!npc.hellExposed && tower?.floors?.[0]?.tileVariant === HELL_VARIANT) {
+    if (npc.state === 'IN_ELEVATOR') {
+      if (Math.floor(elevator.position) === 0 && elevator.doorProgress > 0) {
+        npc.hellExposed = true;
+      }
+    } else if (npc.floor === 0 && npc.state !== 'DESPAWNING') {
+      npc.hellExposed = true;
+    }
+  }
+
   const dtSec = dt / 1000;
   const moveAmount = NPC_SPEED * dtSec;
 

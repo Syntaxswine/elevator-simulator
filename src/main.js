@@ -158,6 +158,7 @@ async function start() {
       workRushEnabled: false,
       restaurantsEnabled: false,    // when true, tower has 0/2/4 unique restaurants
       lunchEnabled: false,          // when true, periodic 3-min "lunch hour" sends casuals to restaurants
+      hellEnabled: false,           // when true, the SB floor becomes HELL (future enemy spawn point)
     },
     metrics: createMetrics(),
     nightness: 0,                    // 0 = full day, 1 = full night; updated each frame

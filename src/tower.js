@@ -6,6 +6,8 @@ import {
   RESTAURANT_COUNT_CHOICES,
   BASEMENT_VARIANT,
   LOBBY_VARIANT,
+  HELL_VARIANT,
+  HELL_LABEL,
 } from './config.js';
 import { createRng, pickRandom } from './rng.js';
 
@@ -14,8 +16,12 @@ import { createRng, pickRandom } from './rng.js';
 //     unique restaurant tiles on randomly chosen above-ground non-lobby
 //     floors. Count and placement are seeded so the same seed produces
 //     the same building.
+//   options.includeHell — when true, the SB sub-basement floor is
+//     replaced by a hellscape (different tile + label "HELL"). Future
+//     home of enemy spawns.
 export function buildTower(seed, options = {}) {
   const includeRestaurants = !!options.includeRestaurants;
+  const includeHell = !!options.includeHell;
   const rng = createRng(seed);
 
   // Above-ground non-lobby floor indices — the slots that vary
@@ -42,11 +48,16 @@ export function buildTower(seed, options = {}) {
   const floors = FLOOR_LABELS.map((label, index) => {
     const isUnderground = UNDERGROUND_FLOOR_LABELS.has(label);
     let tileVariant;
-    if (label === 'L') tileVariant = LOBBY_VARIANT;
+    let displayLabel = label;
+    if (label === 'SB' && includeHell) {
+      tileVariant = HELL_VARIANT;
+      displayLabel = HELL_LABEL;
+    }
+    else if (label === 'L') tileVariant = LOBBY_VARIANT;
     else if (isUnderground) tileVariant = BASEMENT_VARIANT;
     else if (restaurantPlacements.has(index)) tileVariant = restaurantPlacements.get(index);
     else tileVariant = pickRandom(rng, OFFICE_VARIANTS);
-    return { index, label, isUnderground, tileVariant, contents: [] };
+    return { index, label: displayLabel, isUnderground, tileVariant, contents: [] };
   });
   return { floors, seed };
 }

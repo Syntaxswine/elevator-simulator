@@ -88,7 +88,8 @@ export function attachInput(canvas, gameState) {
     // Modal open: floor button (queue + stay open), STOP toggle, or close.
     if (gameState.modal === 'KEYPAD') {
       const modalArea = computeKeypadModalArea(layout);
-      const buttons = computeKeypadButtons(modalArea);
+      const labels = gameState.tower?.floors?.map(f => f.label);
+      const buttons = computeKeypadButtons(modalArea, labels);
       const hit = buttons.find(b => insideRect(p, expandRect(b.rect, tapPad)));
       if (hit) {
         processCall(gameState.elevator, hit.floorIndex);
@@ -184,10 +185,11 @@ function handleOptionChanged(key, gameState) {
     gameState.npcs = gameState.npcs.filter(n => n.type === 'worker');
     sweepStaleCalls(gameState);
   }
-  if (key === 'restaurantsEnabled') {
+  if (key === 'restaurantsEnabled' || key === 'hellEnabled') {
     const seed = gameState.tower?.seed ?? DEFAULT_SEED;
     gameState.tower = buildTower(seed, {
       includeRestaurants: gameState.options.restaurantsEnabled,
+      includeHell: gameState.options.hellEnabled,
     });
   }
 }

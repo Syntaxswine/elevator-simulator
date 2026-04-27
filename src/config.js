@@ -36,6 +36,8 @@ export const RESTAURANT_VARIANTS = [
 export const RESTAURANT_COUNT_CHOICES = [0, 2, 4];
 export const BASEMENT_VARIANT = 'basement';
 export const LOBBY_VARIANT = 'lobby-floor';
+export const HELL_VARIANT = 'hell-floor';
+export const HELL_LABEL = 'HELL';            // floor name when SB is replaced
 
 // NPC limits
 export const NPC_DEFAULT_COUNT = 6;

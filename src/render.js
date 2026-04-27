@@ -162,6 +162,7 @@ const OPTIONS_LIST = [
   { key: 'workRushEnabled',    label: 'WORK RUSH',    type: 'toggle' },
   { key: 'restaurantsEnabled', label: 'RESTAURANTS',  type: 'toggle' },
   { key: 'lunchEnabled',       label: 'LUNCH RUSH',   type: 'toggle' },
+  { key: 'hellEnabled',        label: 'HELL',         type: 'toggle' },
 ];
 
 // Exposed so input.js shares the list (key + type).
@@ -353,7 +354,8 @@ function renderIndicator(ctx, layout, gameState) {
     ctx.drawImage(indicatorImg, indicator.x, indicator.y, indicator.w, indicator.h);
   }
 
-  const label = FLOOR_LABELS[getCurrentFloor(elevator)] ?? '?';
+  const cf = getCurrentFloor(elevator);
+  const label = gameState.tower?.floors?.[cf]?.label ?? FLOOR_LABELS[cf] ?? '?';
   const arrow =
     elevator.direction === 'UP' ? '▲' :
     elevator.direction === 'DOWN' ? '▼' : '';
@@ -774,7 +776,10 @@ export function computeKeypadModalArea(layout) {
 // Returns an array of { position, floorIndex, label, rect } for the 4×3 grid.
 // Layout: position 1 (SB) bottom-left → position 12 ("10") top-right.
 // The grid occupies the upper 4/5 of the modal; STOP gets the bottom row.
-export function computeKeypadButtons(modalArea) {
+// `labels` is an optional array of length 12; when omitted falls back to
+// the static FLOOR_LABELS. Pass tower.floors.map(f => f.label) to honor
+// the live tower's labels (e.g. SB → HELL when the option is on).
+export function computeKeypadButtons(modalArea, labels = FLOOR_LABELS) {
   const cols = 3;
   const rows = 4;
   const padX = modalArea.w * 0.08;
@@ -782,14 +787,14 @@ export function computeKeypadButtons(modalArea) {
   const gridX = modalArea.x + padX;
   const gridY = modalArea.y + padY;
   const gridW = modalArea.w - padX * 2;
-  const gridH = (modalArea.h - padY * 2) * (4 / 5);   // leaves 1/5 for STOP
+  const gridH = (modalArea.h - padY * 2) * (4 / 5);
   const cellW = gridW / cols;
   const cellH = gridH / rows;
 
   const buttons = [];
   for (let p = 1; p <= 12; p++) {
     const floorIndex = p - 1;
-    const label = FLOOR_LABELS[floorIndex];
+    const label = labels[floorIndex] ?? FLOOR_LABELS[floorIndex];
     const mathRow = Math.floor((p - 1) / 3);
     const col = (p - 1) % 3;
     const displayRow = (rows - 1) - mathRow;
@@ -835,8 +840,9 @@ function renderKeypadModal(ctx, layout, gameState) {
   ctx.lineWidth = 3;
   ctx.strokeRect(area.x + 6, area.y + 6, area.w - 12, area.h - 12);
 
-  // Buttons
-  const buttons = computeKeypadButtons(area);
+  // Buttons (live tower labels so SB shows as HELL when that option is on)
+  const labels = gameState.tower?.floors?.map(f => f.label);
+  const buttons = computeKeypadButtons(area, labels);
   for (const btn of buttons) {
     drawKeypadButton(ctx, btn.rect, btn.label, isFloorCalled(elevator, btn.floorIndex));
   }

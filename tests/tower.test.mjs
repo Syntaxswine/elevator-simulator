@@ -105,4 +105,20 @@ describe('tower', () => {
     const t = buildTower(1);
     for (let i = 0; i < 12; i++) assertEquals(t.floors[i].label, expected[i]);
   });
+
+  test('hell option replaces SB tile and label', () => {
+    const t = buildTower(1, { includeHell: true });
+    assertEquals(t.floors[0].label, 'HELL');
+    assertEquals(t.floors[0].tileVariant, 'hell-floor');
+    // B and the rest are unchanged
+    assertEquals(t.floors[1].label, 'B');
+    assertEquals(t.floors[1].tileVariant, 'basement');
+    assertEquals(t.floors[2].label, 'L');
+  });
+
+  test('without hell option, SB is the normal basement', () => {
+    const t = buildTower(1);
+    assertEquals(t.floors[0].label, 'SB');
+    assertEquals(t.floors[0].tileVariant, 'basement');
+  });
 });

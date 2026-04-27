@@ -15,6 +15,7 @@ export const ASSET_MANIFEST = {
   'upscale-food2':   'assets/upscale-food2.png',
   'coffee-shop':     'assets/coffee-shop.png',
   'hell-floor':      'assets/hell-floor.png',
+  'spider-floor':    'assets/spider-floor.png',
   player:            'assets/player.png',
   'elevator-button':        'assets/elevator-button.png',
   'floor-indicator':        'assets/floor-indicator.png',

@@ -10,6 +10,7 @@ import {
   HELL_VARIANT,
 } from './config.js';
 import { getCurrentFloor } from './elevator.js';
+import { spiderSlowFactor } from './spider.js';
 
 export function createPlayer() {
   return {
@@ -54,7 +55,7 @@ export function toggleInOut(player, elevator) {
   }
 }
 
-export function updatePlayer(player, dt, elevator = null, tower = null) {
+export function updatePlayer(player, dt, elevator = null, tower = null, spiders = null) {
   // Hell exposure: same rule as NPCs — sticky red when standing on
   // the hell floor or seeing it through open elevator doors.
   if (!player.hellExposed && tower?.floors?.[0]?.tileVariant === HELL_VARIANT) {
@@ -69,7 +70,9 @@ export function updatePlayer(player, dt, elevator = null, tower = null) {
 
   if (player.state !== 'SLIDING') return;
   const dtSec = dt / 1000;
-  const moveAmount = PLAYER_SPEED * dtSec;
+  // Spider proximity slows the player while on the spider floor.
+  const slow = spiderSlowFactor(spiders, player.floor, player.xOffset);
+  const moveAmount = PLAYER_SPEED * dtSec * slow;
   const remaining = player.targetXOffset - player.xOffset;
   if (Math.abs(remaining) <= moveAmount) {
     player.xOffset = player.targetXOffset;

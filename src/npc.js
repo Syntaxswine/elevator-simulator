@@ -9,6 +9,7 @@ import {
   HELL_VARIANT,
 } from './config.js';
 import { getCurrentFloor, hallCall } from './elevator.js';
+import { spiderSlowFactor } from './spider.js';
 
 const NPC_COLORS = [
   '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
@@ -113,7 +114,7 @@ export function startDeparture(worker, now = performance.now()) {
   worker.arrivedAt = null;
 }
 
-export function updateNpc(npc, dt, elevator, now = performance.now(), tower = null) {
+export function updateNpc(npc, dt, elevator, now = performance.now(), tower = null, spiders = null) {
   // Hell exposure: if the SB floor is the hellscape and this NPC sees
   // it (standing on floor 0, or in the elevator with doors open at
   // floor 0), mark them. Sticky — they render red for the rest of
@@ -129,7 +130,9 @@ export function updateNpc(npc, dt, elevator, now = performance.now(), tower = nu
   }
 
   const dtSec = dt / 1000;
-  const moveAmount = NPC_SPEED * dtSec;
+  // Spider proximity slows walking NPCs on the spider floor.
+  const slow = spiderSlowFactor(spiders, npc.floor, npc.xOffset);
+  const moveAmount = NPC_SPEED * dtSec * slow;
 
   switch (npc.state) {
     case 'WALKING_TO_ELEVATOR':

@@ -11,6 +11,7 @@ import './layout.test.mjs';
 import './clock.test.mjs';
 import './metrics.test.mjs';
 import './elevator.test.mjs';
+import './spider.test.mjs';
 import './npc.test.mjs';
 import './stress.test.mjs';
 

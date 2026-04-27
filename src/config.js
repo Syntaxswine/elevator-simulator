@@ -38,6 +38,15 @@ export const BASEMENT_VARIANT = 'basement';
 export const LOBBY_VARIANT = 'lobby-floor';
 export const HELL_VARIANT = 'hell-floor';
 export const HELL_LABEL = 'HELL';            // floor name when SB is replaced
+export const SPIDER_VARIANT = 'spider-floor';
+export const SPIDER_FLOOR_INDEX = 1;         // basement (B) becomes the spider floor
+
+// Spiders — black * shapes that wander on the spider floor and slow
+// anyone who touches them.
+export const SPIDER_COUNT = 5;
+export const SPIDER_SPEED = 0.4;             // units per second (slow)
+export const SPIDER_TOUCH_RADIUS = 0.45;     // units; entity within this is slowed
+export const SPIDER_SLOW_FACTOR = 0.45;      // moveAmount multiplier while touched
 
 // NPC limits
 export const NPC_DEFAULT_COUNT = 6;

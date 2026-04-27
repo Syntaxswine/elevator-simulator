@@ -11,6 +11,7 @@ import {
   getOptionDescriptors,
 } from './render.js';
 import { buildTower } from './tower.js';
+import { spawnSpiders } from './spider.js';
 import { DEFAULT_SEED } from './config.js';
 import { processCall, toggleDoor, toggleEmergencyStop, getCurrentFloor } from './elevator.js';
 import { setWalkTarget, toggleInOut } from './player.js';
@@ -185,12 +186,16 @@ function handleOptionChanged(key, gameState) {
     gameState.npcs = gameState.npcs.filter(n => n.type === 'worker');
     sweepStaleCalls(gameState);
   }
-  if (key === 'restaurantsEnabled' || key === 'hellEnabled') {
+  if (key === 'restaurantsEnabled' || key === 'hellEnabled' || key === 'spidersEnabled') {
     const seed = gameState.tower?.seed ?? DEFAULT_SEED;
     gameState.tower = buildTower(seed, {
       includeRestaurants: gameState.options.restaurantsEnabled,
       includeHell: gameState.options.hellEnabled,
+      includeSpiders: gameState.options.spidersEnabled,
     });
+  }
+  if (key === 'spidersEnabled') {
+    gameState.spiders = gameState.options.spidersEnabled ? spawnSpiders() : [];
   }
 }
 

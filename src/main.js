@@ -4,6 +4,7 @@ import { buildTower } from './tower.js';
 import { createElevator, updateElevator } from './elevator.js';
 import { createPlayer, updatePlayer } from './player.js';
 import { spawnRandomNpc, spawnDinerNpc, createWorker, startDeparture, updateNpc } from './npc.js';
+import { spawnSpiders, updateSpider } from './spider.js';
 import { createMetrics, recordArrival } from './metrics.js';
 import { computeRushNightness } from './clock.js';
 import { render } from './render.js';
@@ -159,6 +160,7 @@ async function start() {
       restaurantsEnabled: false,    // when true, tower has 0/2/4 unique restaurants
       lunchEnabled: false,          // when true, periodic 3-min "lunch hour" sends casuals to restaurants
       hellEnabled: false,           // when true, the SB floor becomes HELL (future enemy spawn point)
+      spidersEnabled: false,        // when true, B becomes the spider basement; spiders wander and slow contact
     },
     metrics: createMetrics(),
     nightness: 0,                    // 0 = full day, 1 = full night; updated each frame
@@ -176,6 +178,7 @@ async function start() {
       active: false,
       timerMs: LUNCH_INTERVAL_MS,
     },
+    spiders: [],                     // populated when spidersEnabled toggles on
     assets,
   };
   let nextSpawnMs = 4000;
@@ -196,12 +199,16 @@ async function start() {
       gameState.nightness = gameState.options.workRushEnabled
         ? computeRushNightness(gameState.rush, WORK_RUSH_DEPARTURE_DURATION_MS)
         : 0;
-      updateElevator(gameState.elevator, dt);
-      updatePlayer(gameState.player, dt, gameState.elevator, gameState.tower);
+      // Spiders wander on the spider floor; they affect player + NPC speed
+      // by proximity, so update them before the entities that read them.
+      for (const s of gameState.spiders) updateSpider(s, dt);
 
-      // NPC update + lifecycle (tower is needed for hell-exposure check)
+      updateElevator(gameState.elevator, dt);
+      updatePlayer(gameState.player, dt, gameState.elevator, gameState.tower, gameState.spiders);
+
+      // NPC update + lifecycle
       for (const npc of gameState.npcs) {
-        updateNpc(npc, dt, gameState.elevator, now, gameState.tower);
+        updateNpc(npc, dt, gameState.elevator, now, gameState.tower, gameState.spiders);
       }
       // Pick up every newly-arrived rider's trip duration into the rolling
       // average — workers and casuals alike contribute (same units).

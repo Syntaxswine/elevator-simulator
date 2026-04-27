@@ -8,6 +8,7 @@ import {
   LOBBY_VARIANT,
   HELL_VARIANT,
   HELL_LABEL,
+  SPIDER_VARIANT,
 } from './config.js';
 import { createRng, pickRandom } from './rng.js';
 
@@ -19,9 +20,13 @@ import { createRng, pickRandom } from './rng.js';
 //   options.includeHell — when true, the SB sub-basement floor is
 //     replaced by a hellscape (different tile + label "HELL"). Future
 //     home of enemy spawns.
+//   options.includeSpiders — when true, the B basement floor becomes
+//     the spider basement (tile change only; label stays "B"). Spiders
+//     spawn there and slow anyone they touch.
 export function buildTower(seed, options = {}) {
   const includeRestaurants = !!options.includeRestaurants;
   const includeHell = !!options.includeHell;
+  const includeSpiders = !!options.includeSpiders;
   const rng = createRng(seed);
 
   // Above-ground non-lobby floor indices — the slots that vary
@@ -53,6 +58,7 @@ export function buildTower(seed, options = {}) {
       tileVariant = HELL_VARIANT;
       displayLabel = HELL_LABEL;
     }
+    else if (label === 'B' && includeSpiders) tileVariant = SPIDER_VARIANT;
     else if (label === 'L') tileVariant = LOBBY_VARIANT;
     else if (isUnderground) tileVariant = BASEMENT_VARIANT;
     else if (restaurantPlacements.has(index)) tileVariant = restaurantPlacements.get(index);

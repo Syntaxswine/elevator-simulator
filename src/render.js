@@ -163,6 +163,7 @@ const OPTIONS_LIST = [
   { key: 'restaurantsEnabled', label: 'RESTAURANTS',  type: 'toggle' },
   { key: 'lunchEnabled',       label: 'LUNCH RUSH',   type: 'toggle' },
   { key: 'hellEnabled',        label: 'HELL',         type: 'toggle' },
+  { key: 'spidersEnabled',     label: 'SPIDERS',      type: 'toggle' },
 ];
 
 // Exposed so input.js shares the list (key + type).
@@ -391,6 +392,7 @@ function renderTowerView(ctx, layout, gameState) {
   drawFloors(ctx, layout, cameraY, towerModel, elevator, assets);
 
   drawNpcs(ctx, layout, cameraY, gameState.npcs ?? [], elevator, assets, gameState);
+  drawSpiders(ctx, layout, cameraY, gameState.spiders ?? []);
 
   if (isPlayerVisible(player, elevator)) {
     drawPlayer(ctx, layout, cameraY, player, elevator, assets);
@@ -406,6 +408,29 @@ function drawNpcs(ctx, layout, cameraY, npcs, elevator, assets, gameState) {
     const orderIndex = npc.state === 'IN_ELEVATOR' ? inElevatorIndex++ : 0;
     drawNpc(ctx, layout, cameraY, npc, elevator, assets, orderIndex, gameState);
   }
+}
+
+// Spiders: black "*" glyphs sitting in the middle of the spider floor.
+// They wander left-right; the renderer just plots them at their current x.
+function drawSpiders(ctx, layout, cameraY, spiders) {
+  if (!spiders || spiders.length === 0) return;
+  const { unitSizePx } = layout;
+  const yScreen = towerYToScreenY(1.5, layout, cameraY);  // mid of B floor
+  ctx.save();
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const fontPx = Math.floor(unitSizePx * 0.7);
+  ctx.font = `bold ${fontPx}px monospace`;
+  for (const s of spiders) {
+    const x = towerXToScreenX(s.x, layout);
+    // Subtle white outline so the * shows on dark backgrounds
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = Math.max(1, fontPx * 0.06);
+    ctx.strokeText('*', x, yScreen);
+    ctx.fillText('*', x, yScreen);
+  }
+  ctx.restore();
 }
 
 function drawNpc(ctx, layout, cameraY, npc, elevator, assets, indexInElevator, gameState) {
